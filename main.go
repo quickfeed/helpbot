@@ -42,7 +42,9 @@ func main() {
 
 	defer func() {
 		err := client.StayConnectedUntilInterrupted(context.Background())
-		log.Errorln("Discord exited with error:", err)
+		if err != nil {
+			log.Errorln("Discord exited with error:", err)
+		}
 	}()
 
 	client.Ready(func() {
