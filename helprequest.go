@@ -23,10 +23,10 @@ func helpRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 	// check if an open request already exists
 	pos, err := getPosInQueue(tx, m.Message.Author.ID)
 	if err != nil {
-		log.Println("helpRequest: failed to get user pos in queue")
+		log.Errorln("helpRequest: failed to get user pos in queue")
 		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "An error occurred while creating your request.")
 		if err != nil {
-			log.Println("helpRequest: failed to send error message:", err)
+			log.Errorln("helpRequest: failed to send error message:", err)
 		}
 		return
 	}
@@ -35,7 +35,7 @@ func helpRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 	if pos > 0 {
 		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, fmt.Sprintf("You are already at postition %d in the queue", pos))
 		if err != nil {
-			log.Println("helpRequest: failed to send message:", err)
+			log.Errorln("helpRequest: failed to send message:", err)
 		}
 		return
 	}
@@ -48,20 +48,20 @@ func helpRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 
 	err = tx.Create(req).Error
 	if err != nil {
-		log.Println("helpRequest: failed to create new request:", err)
+		log.Errorln("helpRequest: failed to create new request:", err)
 		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "An error occurred while creating your request.")
 		if err != nil {
-			log.Println("helpRequest: failed to send error message:", err)
+			log.Errorln("helpRequest: failed to send error message:", err)
 		}
 		return
 	}
 
 	pos, err = getPosInQueue(tx, m.Message.Author.ID)
 	if err != nil {
-		log.Println("helpRequest: failed to get pos in queue after creating request")
+		log.Errorln("helpRequest: failed to get pos in queue after creating request")
 		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "An error occurred while creating your request.")
 		if err != nil {
-			log.Println("helpReqest: failed to send error message:", err)
+			log.Errorln("helpReqest: failed to send error message:", err)
 		}
 		return
 	}
@@ -69,7 +69,7 @@ func helpRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 
 	_, _, err = m.Message.Author.SendMsgString(m.Ctx, s, fmt.Sprintf("A help request has been created, and you are at position %d in the queue.", pos))
 	if err != nil {
-		log.Println("helpRequest: failed to send response:", err)
+		log.Errorln("helpRequest: failed to send response:", err)
 	}
 }
 

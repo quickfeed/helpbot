@@ -64,7 +64,7 @@ func main() {
 
 	defer func() {
 		err := client.StayConnectedUntilInterrupted(context.Background())
-		log.Println("Discord exited with error:", err)
+		log.Errorln("Discord exited with error:", err)
 	}()
 
 	initCommands()
@@ -83,7 +83,7 @@ func main() {
 	client.Ready(func() {
 		err := client.UpdateStatusString(fmt.Sprintf("DM me %shelp", cfg.Prefix))
 		if err != nil {
-			log.Println("Failed to update status:", err)
+			log.Errorln("Failed to update status:", err)
 		}
 	})
 }
@@ -96,7 +96,7 @@ func discordMessageCreate(s disgord.Session, m *disgord.MessageCreate) {
 
 	gm, err := s.GetMember(m.Ctx, cfg.Guild, m.Message.Author.ID)
 	if err != nil {
-		log.Println("messageCreate: Failed to get guild member: ")
+		log.Infoln("messageCreate: Failed to get guild member:", err)
 		return
 	}
 
