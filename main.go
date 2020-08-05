@@ -34,8 +34,6 @@ func main() {
 	}
 	defer db.Close()
 
-	initCommands()
-
 	client := disgord.New(disgord.Config{
 		BotToken: viper.GetString("token"),
 	})
