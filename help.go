@@ -2,9 +2,8 @@ package main
 
 import (
 	"bytes"
-	"log"
 
-	"github.com/bwmarrin/discordgo"
+	"github.com/andersfylling/disgord"
 )
 
 var studentHelp = createTemplate("studentHelp", `Available commands:
@@ -26,13 +25,13 @@ var assitantHelp = createTemplate("assistantHelp", `Teaching Assistant commands:
 {{.Prefix}}clear:            Clears the queue!
 `+"```")
 
-func helpCommand(s *discordgo.Session, m *discordgo.Message) {
+func helpCommand(s disgord.Session, m *disgord.MessageCreate) {
 	var (
 		assistant = false
 		student   = false
 		buf       = new(bytes.Buffer)
 	)
-	gm, err := s.GuildMember(cfg.Guild, m.Author.ID)
+	gm, err := s.GetMember(m.Ctx, cfg.Guild, m.Message.Author.ID)
 	if err != nil {
 		log.Println("Failed to get guild member:", err)
 		return
@@ -60,12 +59,7 @@ func helpCommand(s *discordgo.Session, m *discordgo.Message) {
 	} else {
 		return
 	}
-	ch, err := s.UserChannelCreate(m.Author.ID)
-	if err != nil {
-		log.Println("Failed to create user channel:", err)
-		return
-	}
-	_, err = s.ChannelMessageSend(ch.ID, buf.String())
+	_, _, err = m.Message.Author.SendMsgString(m.Ctx, s, buf.String())
 	if err != nil {
 		log.Println("Failed to send help message:", err)
 	}

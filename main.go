@@ -1,15 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"log"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 
-	"github.com/bwmarrin/discordgo"
+	"github.com/andersfylling/disgord"
+	"github.com/andersfylling/disgord/std"
 	"github.com/jinzhu/gorm"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -22,9 +22,15 @@ var (
 	cfg      config
 	db       *gorm.DB
 	commands = make(commandMap)
+	log      = &logrus.Logger{
+		Out:       os.Stderr,
+		Formatter: new(logrus.TextFormatter),
+		Hooks:     make(logrus.LevelHooks),
+		Level:     logrus.ErrorLevel,
+	}
 )
 
-type command func(s *discordgo.Session, m *discordgo.Message)
+type command func(s disgord.Session, m *disgord.MessageCreate)
 
 type commandMap map[string]command
 
@@ -49,56 +55,45 @@ func main() {
 	}
 	defer db.Close()
 
-	token := viper.GetString("token")
-	dg, err := discordgo.New("Bot " + token)
-	if err != nil {
-		log.Fatalln("Error creating Discord session:", err)
-	}
+	client := disgord.New(disgord.Config{
+		BotToken: viper.GetString("token"),
+	})
+
+	defer func() {
+		err := client.StayConnectedUntilInterrupted(context.Background())
+		log.Println("Discord exited with error:", err)
+	}()
 
 	initCommands()
+	filter, _ := std.NewMsgFilter(context.Background(), client)
+	filter.SetPrefix("!")
 
-	dg.AddHandler(discordMessageCreate)
-	dg.AddHandler(discordReady)
+	// create a handler and bind it to new message events
+	// tip: read the documentation for std.CopyMsgEvt and understand why it is used here.
+	client.On(disgord.EvtMessageCreate,
+		// middleware
+		filter.NotByBot,    // ignore bot messages
+		filter.HasPrefix,   // read original
+		std.CopyMsgEvt,     // read & copy original
+		filter.StripPrefix, // write copy
+		// handler
+		discordMessageCreate) // handles copy
 
-	err = dg.Open()
-	if err != nil {
-		log.Fatalln("Failed to open connection to discord:", err)
-	}
-
-	fmt.Println(botName, "is now running. Press CTRL-C to exit.")
-	fmt.Println("Use the following link to invite the bot to your server:")
-	fmt.Printf("https://discord.com/api/oauth2/authorize?client_id=%s&permissions=0&scope=bot\n", dg.State.User.ID)
-
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM)
-	<-sc
-
-	dg.Close()
+	client.Ready(func() {
+		err := client.UpdateStatusString(fmt.Sprintf("DM me %shelp", cfg.Prefix))
+		if err != nil {
+			log.Println("Failed to update status:", err)
+		}
+	})
 }
 
-func discordMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	// Ignore all messages from self
-	if m.Author.ID == s.State.User.ID {
-		return
-	}
-
-	if !strings.HasPrefix(m.Content, cfg.Prefix) {
-		return
-	}
-
-	words := strings.Fields(m.Content)
+func discordMessageCreate(s disgord.Session, m *disgord.MessageCreate) {
+	words := strings.Fields(m.Message.Content)
 	if len(words) < 1 {
 		return
 	}
 
 	if cmdFunc, ok := commands[words[0]]; ok {
-		cmdFunc(s, m.Message)
-	}
-}
-
-func discordReady(s *discordgo.Session, r *discordgo.Ready) {
-	err := s.UpdateStatus(0, "DM me !help")
-	if err != nil {
-		log.Println("Failed to update status:", err)
+		cmdFunc(s, m)
 	}
 }

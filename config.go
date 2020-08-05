@@ -1,17 +1,18 @@
 package main
 
 import (
+	"github.com/andersfylling/disgord"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
 type config struct {
 	Prefix        string
-	Guild         string
-	HelpChannel   string `mapstructure:"help-channel"`
-	LobbyChannel  string `mapstructure:"lobby-channel"`
-	StudentRole   string `mapstructure:"student-role"`
-	AssistantRole string `mapstructure:"assistant-role"`
+	Guild         disgord.Snowflake
+	HelpChannel   disgord.Snowflake `mapstructure:"help-channel"`
+	LobbyChannel  disgord.Snowflake `mapstructure:"lobby-channel"`
+	StudentRole   disgord.Snowflake `mapstructure:"student-role"`
+	AssistantRole disgord.Snowflake `mapstructure:"assistant-role"`
 }
 
 func initConfig() (err error) {
@@ -19,11 +20,11 @@ func initConfig() (err error) {
 	pflag.String("token", "", "Bot Token")
 	pflag.String("db-path", "file::memory:?cache=shared", "Path to database file (defaults to in-memory)")
 	pflag.String("prefix", "!", "Prefix for all commands")
-	pflag.String("guild", "", "Guild ID")
-	pflag.String("help-channel", "", "Text channel to serve")
-	pflag.String("lobby-channel", "", "Voice channel to direct users to")
-	pflag.String("student-role", "", "Role ID for students")
-	pflag.String("assistant-role", "", "Role ID for teaching assistants")
+	pflag.Uint64("guild", 0, "Guild ID")
+	pflag.Uint64("help-channel", 0, "Text channel to serve")
+	pflag.Uint64("lobby-channel", 0, "Voice channel to direct users to")
+	pflag.Uint64("student-role", 0, "Role ID for students")
+	pflag.Uint64("assistant-role", 0, "Role ID for teaching assistants")
 	pflag.Parse()
 
 	err = viper.BindPFlags(pflag.CommandLine)
