@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"text/template"
 
 	"github.com/andersfylling/disgord"
 )
@@ -25,42 +27,29 @@ var assitantHelp = createTemplate("assistantHelp", `Teaching Assistant commands:
 {{.Prefix}}clear:            Clears the queue!
 `+"```")
 
-func helpCommand(s disgord.Session, m *disgord.MessageCreate) {
-	var (
-		assistant = false
-		student   = false
-		buf       = new(bytes.Buffer)
-	)
-	gm, err := s.GetMember(m.Ctx, cfg.Guild, m.Message.Author.ID)
+func helpCommand(s disgord.Session, m *disgord.MessageCreate, helpTmpl *template.Template) error {
+	buf := new(bytes.Buffer)
+	err := helpTmpl.Execute(buf, cfg)
 	if err != nil {
-		log.Println("Failed to get guild member:", err)
-		return
-	}
-	for _, role := range gm.Roles {
-		if role == cfg.AssistantRole {
-			assistant = true
-		}
-		if role == cfg.StudentRole {
-			student = true
-		}
-	}
-	if assistant {
-		err := assitantHelp.Execute(buf, cfg)
-		if err != nil {
-			log.Println("Failed to execute assitant help template:", err)
-			return
-		}
-	} else if student {
-		err := studentHelp.Execute(buf, cfg)
-		if err != nil {
-			log.Println("Failed to execute student help template:", err)
-			return
-		}
-	} else {
-		return
+		return fmt.Errorf("helpCommand: failed to execute template: %w", err)
 	}
 	_, _, err = m.Message.Author.SendMsgString(m.Ctx, s, buf.String())
 	if err != nil {
-		log.Println("Failed to send help message:", err)
+		return fmt.Errorf("helpCommand: failed to send help message: %w", err)
+	}
+	return nil
+}
+
+func studentHelpCommand(s disgord.Session, m *disgord.MessageCreate) {
+	err := helpCommand(s, m, studentHelp)
+	if err != nil {
+		log.Error(err)
+	}
+}
+
+func assistantHelpCommand(s disgord.Session, m *disgord.MessageCreate) {
+	err := helpCommand(s, m, assitantHelp)
+	if err != nil {
+		log.Error(err)
 	}
 }

@@ -19,10 +19,11 @@ const (
 )
 
 var (
-	cfg      config
-	db       *gorm.DB
-	commands = make(commandMap)
-	log      = &logrus.Logger{
+	cfg               config
+	db                *gorm.DB
+	studentCommands   = make(commandMap)
+	assistantCommands = make(commandMap)
+	log               = &logrus.Logger{
 		Out:       os.Stderr,
 		Formatter: new(logrus.TextFormatter),
 		Hooks:     make(logrus.LevelHooks),
@@ -35,12 +36,14 @@ type command func(s disgord.Session, m *disgord.MessageCreate)
 type commandMap map[string]command
 
 func (commands commandMap) Register(name string, handler command) {
-	commands[cfg.Prefix+name] = handler
+	commands[name] = handler
 }
 
 func initCommands() {
-	commands.Register("help", helpCommand)
-	commands.Register("ta", helpRequestCommand)
+	studentCommands.Register("help", studentHelpCommand)
+	studentCommands.Register("ta", helpRequestCommand)
+
+	assistantCommands.Register("help", assistantHelpCommand)
 }
 
 func main() {
@@ -66,18 +69,16 @@ func main() {
 
 	initCommands()
 	filter, _ := std.NewMsgFilter(context.Background(), client)
-	filter.SetPrefix("!")
+	filter.SetPrefix(cfg.Prefix)
 
 	// create a handler and bind it to new message events
-	// tip: read the documentation for std.CopyMsgEvt and understand why it is used here.
 	client.On(disgord.EvtMessageCreate,
 		// middleware
-		filter.NotByBot,    // ignore bot messages
-		filter.HasPrefix,   // read original
-		std.CopyMsgEvt,     // read & copy original
-		filter.StripPrefix, // write copy
+		filter.NotByBot, // ignore bot messages
+		filter.HasPrefix,
+		filter.StripPrefix,
 		// handler
-		discordMessageCreate) // handles copy
+		discordMessageCreate)
 
 	client.Ready(func() {
 		err := client.UpdateStatusString(fmt.Sprintf("DM me %shelp", cfg.Prefix))
@@ -93,7 +94,21 @@ func discordMessageCreate(s disgord.Session, m *disgord.MessageCreate) {
 		return
 	}
 
-	if cmdFunc, ok := commands[words[0]]; ok {
-		cmdFunc(s, m)
+	gm, err := s.GetMember(m.Ctx, cfg.Guild, m.Message.Author.ID)
+	if err != nil {
+		log.Println("messageCreate: Failed to get guild member: ")
+		return
+	}
+
+	if hasRoles(s, gm, cfg.StudentRole) {
+		if cmdFunc, ok := studentCommands[words[0]]; ok {
+			cmdFunc(s, m)
+		}
+	}
+
+	if hasRoles(s, gm, cfg.AssistantRole) {
+		if cmdFunc, ok := assistantCommands[words[0]]; ok {
+			cmdFunc(s, m)
+		}
 	}
 }
