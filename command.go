@@ -25,6 +25,7 @@ var (
 	}
 	assistantCommands = commandMap{
 		"help": assistantHelpCommand,
+		"next": nextRequestCommand,
 	}
 )
 
@@ -165,12 +166,16 @@ func cancelRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 		"reason":  "userCancel",
 		"done_at": time.Now(),
 	}).Error
-	if err != nil {
-		if gorm.IsRecordNotFoundError(err) {
-			_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "You do not have an active help request.")
-			if err != nil {
-				log.Errorln("Failed to send error message:", err)
-			}
+	if gorm.IsRecordNotFoundError(err) {
+		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "You do not have an active help request.")
+		if err != nil {
+			log.Errorln("Failed to send error message:", err)
+		}
+		return
+	} else if err != nil {
+		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "An unknown error occurred.")
+		if err != nil {
+			log.Errorln("Failed to send error message:", err)
 		}
 		return
 	}
@@ -178,4 +183,44 @@ func cancelRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 	if err != nil {
 		log.Errorln("Failed to send message:", err)
 	}
+}
+
+func nextRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
+	tx := db.Begin()
+	defer tx.RollbackUnlessCommitted()
+
+	var req HelpRequest
+	err := tx.Where("done = ?", false).Order("created_at asc").First(&req).Error
+	if gorm.IsRecordNotFoundError(err) {
+		// TODO: set assitant in an idle state and notify when a new request arrives
+		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "There are no more requests in the queue.")
+		if err != nil {
+			log.Errorln("Failed to send error message:", err)
+		}
+		return
+	} else if err != nil {
+		log.Errorln("Failed to get next user:", err)
+		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "An unknown error occurred.")
+		if err != nil {
+			log.Errorln("Failed to send error message:", err)
+		}
+		return
+	}
+
+	tx.Delete(&req)
+	student, err := s.GetUser(m.Ctx, req.UserID)
+	if err != nil {
+		log.Errorln("Failed to fetch user")
+		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "An unknown error occurred.")
+		if err != nil {
+			log.Errorln("Failed to send error message:", err)
+		}
+		return
+	}
+	_, _, err = m.Message.Author.SendMsgString(m.Ctx, s, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type, student.Tag()))
+	if err != nil {
+		log.Errorln("Failed to send message:", err)
+		return
+	}
+	tx.Commit()
 }
