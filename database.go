@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+var db *gorm.DB
+
 type HelpRequest struct {
 	gorm.Model
 	UserID      disgord.Snowflake `gorm:"INDEX"`

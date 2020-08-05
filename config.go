@@ -6,6 +6,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+var cfg config
+
 type config struct {
 	Prefix        string
 	Guild         disgord.Snowflake

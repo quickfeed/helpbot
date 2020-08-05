@@ -4,11 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/andersfylling/disgord"
-	"github.com/andersfylling/disgord/std"
-	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -18,32 +15,11 @@ const (
 	cfgFile = ".helpbotrc"
 )
 
-var (
-	cfg               config
-	db                *gorm.DB
-	studentCommands   = make(commandMap)
-	assistantCommands = make(commandMap)
-	log               = &logrus.Logger{
-		Out:       os.Stderr,
-		Formatter: new(logrus.TextFormatter),
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrus.ErrorLevel,
-	}
-)
-
-type command func(s disgord.Session, m *disgord.MessageCreate)
-
-type commandMap map[string]command
-
-func (commands commandMap) Register(name string, handler command) {
-	commands[name] = handler
-}
-
-func initCommands() {
-	studentCommands.Register("help", studentHelpCommand)
-	studentCommands.Register("ta", helpRequestCommand)
-
-	assistantCommands.Register("help", assistantHelpCommand)
+var log = &logrus.Logger{
+	Out:       os.Stderr,
+	Formatter: new(logrus.TextFormatter),
+	Hooks:     make(logrus.LevelHooks),
+	Level:     logrus.ErrorLevel,
 }
 
 func main() {
@@ -58,27 +34,18 @@ func main() {
 	}
 	defer db.Close()
 
+	initCommands()
+
 	client := disgord.New(disgord.Config{
 		BotToken: viper.GetString("token"),
 	})
+
+	initEvents(client)
 
 	defer func() {
 		err := client.StayConnectedUntilInterrupted(context.Background())
 		log.Errorln("Discord exited with error:", err)
 	}()
-
-	initCommands()
-	filter, _ := std.NewMsgFilter(context.Background(), client)
-	filter.SetPrefix(cfg.Prefix)
-
-	// create a handler and bind it to new message events
-	client.On(disgord.EvtMessageCreate,
-		// middleware
-		filter.NotByBot, // ignore bot messages
-		filter.HasPrefix,
-		filter.StripPrefix,
-		// handler
-		discordMessageCreate)
 
 	client.Ready(func() {
 		err := client.UpdateStatusString(fmt.Sprintf("DM me %shelp", cfg.Prefix))
@@ -86,29 +53,4 @@ func main() {
 			log.Errorln("Failed to update status:", err)
 		}
 	})
-}
-
-func discordMessageCreate(s disgord.Session, m *disgord.MessageCreate) {
-	words := strings.Fields(m.Message.Content)
-	if len(words) < 1 {
-		return
-	}
-
-	gm, err := s.GetMember(m.Ctx, cfg.Guild, m.Message.Author.ID)
-	if err != nil {
-		log.Infoln("messageCreate: Failed to get guild member:", err)
-		return
-	}
-
-	if hasRoles(s, gm, cfg.StudentRole) {
-		if cmdFunc, ok := studentCommands[words[0]]; ok {
-			cmdFunc(s, m)
-		}
-	}
-
-	if hasRoles(s, gm, cfg.AssistantRole) {
-		if cmdFunc, ok := assistantCommands[words[0]]; ok {
-			cmdFunc(s, m)
-		}
-	}
 }
