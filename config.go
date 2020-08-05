@@ -17,12 +17,13 @@ type config struct {
 func initConfig() (err error) {
 	// command line
 	pflag.String("token", "", "Bot Token")
+	pflag.String("db-path", "file::memory:?cache=shared", "Path to database file (defaults to in-memory)")
 	pflag.String("prefix", "!", "Prefix for all commands")
 	pflag.String("guild", "", "Guild ID")
 	pflag.String("help-channel", "", "Text channel to serve")
 	pflag.String("lobby-channel", "", "Voice channel to direct users to")
 	pflag.String("student-role", "", "Role ID for students")
-	pflag.String("AssistantRole", "", "Role ID for teaching assistants")
+	pflag.String("assistant-role", "", "Role ID for teaching assistants")
 	pflag.Parse()
 
 	err = viper.BindPFlags(pflag.CommandLine)

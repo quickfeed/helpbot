@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/jinzhu/gorm"
 	"github.com/spf13/viper"
 )
 
@@ -19,6 +20,7 @@ const (
 
 var (
 	cfg      config
+	db       *gorm.DB
 	commands = make(commandMap)
 )
 
@@ -30,11 +32,22 @@ func (commands commandMap) Register(name string, handler command) {
 	commands[cfg.Prefix+name] = handler
 }
 
+func initCommands() {
+	commands.Register("help", helpCommand)
+	commands.Register("ta", helpRequestCommand)
+}
+
 func main() {
 	err := initConfig()
 	if err != nil {
 		log.Fatalln("Failed to read config:", err)
 	}
+
+	err = initDB()
+	if err != nil {
+		log.Fatalln("Failed to init database:", err)
+	}
+	defer db.Close()
 
 	token := viper.GetString("token")
 	dg, err := discordgo.New("Bot " + token)
@@ -61,10 +74,6 @@ func main() {
 	<-sc
 
 	dg.Close()
-}
-
-func initCommands() {
-	commands.Register("help", helpCommand)
 }
 
 func discordMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
