@@ -1,10 +1,12 @@
 FROM golang:alpine as builder
 
+RUN apk add build-base
+
 COPY . /src
 WORKDIR /src
-ENV CGO_ENABLED 0
+ENV CGO_ENABLED 1
 RUN go mod download
-RUN go install -ldflags '-s -w' .
+RUN go install -ldflags '-s -w -extldflags "-static"' .
 
 FROM scratch
 
