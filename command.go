@@ -29,6 +29,7 @@ var (
 		"length": lengthCommand,
 		"list":   listCommand,
 		"next":   nextRequestCommand,
+		"clear":  clearCommand,
 	}
 )
 
@@ -186,7 +187,9 @@ func nextRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 
 	req.AssistantID = m.Message.Author.ID
 	req.Done = true
+	req.DoneAt = time.Now()
 	req.Reason = "assistantNext"
+
 	err = tx.Update(&req).Error
 	if err != nil {
 		log.Errorln("Failed to update request:", err)
@@ -262,4 +265,30 @@ func listCommand(s disgord.Session, m *disgord.MessageCreate) {
 	}
 	sb.WriteString("```")
 	replyMsg(s, m, sb.String())
+}
+
+func clearCommand(s disgord.Session, m *disgord.MessageCreate) {
+	words := strings.Fields(m.Message.Content)
+	if len(words) < 2 || words[1] != "YES" {
+		replyMsg(s, m, fmt.Sprintf(
+			"This command will cancel all the requests in the queue. If you really want to do this, type `%sclear YES`",
+			cfg.Prefix,
+		))
+		return
+	}
+
+	// TODO: send a message to each student whose request was cleared.
+	err := db.Model(&HelpRequest{}).Where("done = ? ", false).Updates(map[string]interface{}{
+		"done":         true,
+		"done_at":      time.Now(),
+		"assistant_id": m.Message.Author.ID,
+		"reason":       "assistantClear",
+	}).Error
+	if err != nil {
+		log.Errorln("Failed to clear queue:", err)
+		replyMsg(s, m, "Clear failed due to an error.")
+		return
+	}
+
+	replyMsg(s, m, "The queue was cleared.")
 }
