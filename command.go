@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -33,11 +34,17 @@ var (
 	}
 )
 
-func replyMsg(s disgord.Session, m *disgord.MessageCreate, msg string) {
-	_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, msg)
+func replyMsg(s disgord.Session, m *disgord.MessageCreate, msg string) bool {
+	return sendMsg(m.Ctx, s, m.Message.Author, msg)
+}
+
+func sendMsg(ctx context.Context, s disgord.Session, u *disgord.User, msg string) bool {
+	_, _, err := u.SendMsgString(ctx, s, msg)
 	if err != nil {
 		log.Errorln("Sending message failed:", err)
+		return false
 	}
+	return true
 }
 
 var studentHelp = createTemplate("studentHelp", `Available commands:
@@ -104,16 +111,21 @@ func helpRequestCommand(s disgord.Session, m *disgord.MessageCreate, requestType
 		return
 	}
 
-	req := &HelpRequest{
+	req := HelpRequest{
 		UserID: m.Message.Author.ID,
 		Type:   requestType,
 		Done:   false,
 	}
 
-	err = tx.Create(req).Error
+	err = tx.Create(&req).Error
 	if err != nil {
 		log.Errorln("helpRequest: failed to create new request:", err)
 		replyMsg(s, m, "An error occurred while creating your request.")
+		return
+	}
+
+	if assignToIdleAssistant(m.Ctx, s, tx, req) {
+		tx.Commit()
 		return
 	}
 
@@ -126,6 +138,57 @@ func helpRequestCommand(s disgord.Session, m *disgord.MessageCreate, requestType
 	tx.Commit()
 
 	replyMsg(s, m, fmt.Sprintf("A help request has been created, and you are at position %d in the queue.", pos))
+}
+
+// assignToIdleAssistant will check if any assistants are waiting for a request and pick one of them to handle req.
+// db must be a transaction.
+func assignToIdleAssistant(ctx context.Context, s disgord.Session, db *gorm.DB, req HelpRequest) bool {
+	err := db.Where("waiting = ?", true).Take(&req.Assistant).Error
+	if gorm.IsRecordNotFoundError(err) {
+		return false
+	} else if err != nil {
+		log.Errorln("Failed to query for idle assitants:", err)
+		return false
+	}
+
+	studUser, err := s.GetUser(ctx, req.UserID)
+	if err != nil {
+		log.Errorln("Failed to retrieve user info for student:", err)
+		return false
+	}
+
+	assistantUser, err := s.GetUser(ctx, req.Assistant.UserID)
+	if err != nil {
+		log.Errorln("Failed to retrieve user info for assistant:", err)
+		return false
+	}
+
+	req.Assistant.Waiting = false
+	req.Done = true
+	req.DoneAt = time.Now()
+	req.Reason = "assistantNext"
+
+	err = db.Model(&Assistant{}).Update("waiting", false).Error
+	if err != nil {
+		log.Errorln("Failed to update assistant status:", err)
+		return false
+	}
+
+	err = db.Update(&req).Error
+	if err != nil {
+		log.Errorln("Failed to update request:", err)
+		return false
+	}
+
+	if !sendMsg(ctx, s, assistantUser, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type, studUser.Tag())) {
+		return false
+	}
+
+	if !sendMsg(ctx, s, studUser, fmt.Sprintf("You will now receive help from %s.", assistantUser.Tag())) {
+		return false
+	}
+
+	return true
 }
 
 func getPosInQueue(db *gorm.DB, userID disgord.Snowflake) (rowNumber int, err error) {
@@ -170,14 +233,36 @@ func cancelRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 }
 
 func nextRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
+	// register assistant in DB
+	var assistant Assistant
+	err := db.Where("user_id = ?", m.Message.Author.ID).First(&assistant).Error
+	if gorm.IsRecordNotFoundError(err) {
+		err := db.Create(&Assistant{
+			UserID:  m.Message.Author.ID,
+			Waiting: false,
+		}).Error
+		if err != nil {
+			log.Errorln("Failed to create assistant record:", err)
+		}
+	} else if err != nil {
+		log.Errorln("Failed to store assistant in DB:", err)
+	}
+
 	tx := db.Begin()
 	defer tx.RollbackUnlessCommitted()
 
 	var req HelpRequest
-	err := tx.Where("done = ?", false).Order("created_at asc").First(&req).Error
+	err = tx.Where("done = ?", false).Order("created_at asc").First(&req).Error
 	if gorm.IsRecordNotFoundError(err) {
-		// TODO: set assitant in an idle state and notify when a new request arrives
-		replyMsg(s, m, "There are no more requests in the queue.")
+		assistant.Waiting = true
+		err := tx.Model(&Assistant{}).Update(&assistant).Error
+		if err != nil {
+			log.Errorln("Failed to update waiting state for assistant:", err)
+			replyMsg(s, m, "There are no more requests in the queue, but due to an error, you won't receive a notification when the next one arrives.")
+			return
+		}
+		// FIXIME: does not work
+		replyMsg(s, m, "There are no more requests in the queue. You will receive a message when the next request arrives.")
 		return
 	} else if err != nil {
 		log.Errorln("Failed to get next user:", err)
@@ -185,12 +270,12 @@ func nextRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 		return
 	}
 
-	req.AssistantID = m.Message.Author.ID
+	req.Assistant = assistant
 	req.Done = true
 	req.DoneAt = time.Now()
 	req.Reason = "assistantNext"
 
-	err = tx.Update(&req).Error
+	err = tx.Model(&HelpRequest{}).Update(&req).Error
 	if err != nil {
 		log.Errorln("Failed to update request:", err)
 		replyMsg(s, m, "An error occurred while updating request.")
@@ -203,7 +288,14 @@ func nextRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 		replyMsg(s, m, "An unknown error occurred.")
 		return
 	}
-	replyMsg(s, m, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type, student.Tag()))
+
+	if !replyMsg(s, m, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type, student.Tag())) {
+		return
+	}
+
+	// TODO: handle nicknames
+	sendMsg(m.Ctx, s, student, fmt.Sprintf("You will now receive help from %s", m.Message.Author.Tag()))
+
 	tx.Commit()
 }
 
@@ -279,10 +371,10 @@ func clearCommand(s disgord.Session, m *disgord.MessageCreate) {
 
 	// TODO: send a message to each student whose request was cleared.
 	err := db.Model(&HelpRequest{}).Where("done = ? ", false).Updates(map[string]interface{}{
-		"done":         true,
-		"done_at":      time.Now(),
-		"assistant_id": m.Message.Author.ID,
-		"reason":       "assistantClear",
+		"done":              true,
+		"done_at":           time.Now(),
+		"assistant_user_id": m.Message.Author.ID,
+		"reason":            "assistantClear",
 	}).Error
 	if err != nil {
 		log.Errorln("Failed to clear queue:", err)

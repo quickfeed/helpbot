@@ -14,18 +14,19 @@ var db *gorm.DB
 func initDB() (err error) {
 	dbPath := viper.GetString("db-path")
 	db, err = gorm.Open("sqlite3", dbPath)
-	db.AutoMigrate(&HelpRequest{})
+	db.AutoMigrate(&Assistant{}, &HelpRequest{})
 	return
 }
 
 type HelpRequest struct {
 	gorm.Model
-	UserID      disgord.Snowflake `gorm:"index"`
-	AssistantID disgord.Snowflake
-	Type        string `gorm:"index"`
-	Done        bool
-	Reason      string
-	DoneAt      time.Time
+	UserID          disgord.Snowflake `gorm:"index"`
+	AssistantUserID disgord.Snowflake
+	Assistant       Assistant
+	Type            string `gorm:"index"`
+	Done            bool
+	Reason          string
+	DoneAt          time.Time
 }
 
 type Assistant struct {
