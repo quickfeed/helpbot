@@ -1,10 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"text/template"
 	"time"
 
@@ -24,10 +25,19 @@ var (
 		"cancel":  cancelRequestCommand,
 	}
 	assistantCommands = commandMap{
-		"help": assistantHelpCommand,
-		"next": nextRequestCommand,
+		"help":   assistantHelpCommand,
+		"length": lengthCommand,
+		"list":   listCommand,
+		"next":   nextRequestCommand,
 	}
 )
+
+func replyMsg(s disgord.Session, m *disgord.MessageCreate, msg string) {
+	_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, msg)
+	if err != nil {
+		log.Errorln("Sending message failed:", err)
+	}
+}
 
 var studentHelp = createTemplate("studentHelp", `Available commands:
 `+"```"+`
@@ -51,15 +61,12 @@ var assitantHelp = createTemplate("assistantHelp", `Teaching Assistant commands:
 `+"```")
 
 func helpCommand(s disgord.Session, m *disgord.MessageCreate, helpTmpl *template.Template) error {
-	buf := new(bytes.Buffer)
+	buf := new(strings.Builder)
 	err := helpTmpl.Execute(buf, cfg)
 	if err != nil {
 		return fmt.Errorf("helpCommand: failed to execute template: %w", err)
 	}
-	_, _, err = m.Message.Author.SendMsgString(m.Ctx, s, buf.String())
-	if err != nil {
-		return fmt.Errorf("helpCommand: failed to send help message: %w", err)
-	}
+	replyMsg(s, m, buf.String())
 	return nil
 }
 
@@ -86,19 +93,13 @@ func helpRequestCommand(s disgord.Session, m *disgord.MessageCreate, requestType
 	pos, err := getPosInQueue(tx, m.Message.Author.ID)
 	if err != nil {
 		log.Errorln("helpRequest: failed to get user pos in queue")
-		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "An error occurred while creating your request.")
-		if err != nil {
-			log.Errorln("helpRequest: failed to send error message:", err)
-		}
+		replyMsg(s, m, "An error occurred while creating your request.")
 		return
 	}
 
 	// already in the queue, no need to do anything.
 	if pos > 0 {
-		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, fmt.Sprintf("You are already at postition %d in the queue", pos))
-		if err != nil {
-			log.Errorln("helpRequest: failed to send message:", err)
-		}
+		replyMsg(s, m, fmt.Sprintf("You are already at postition %d in the queue", pos))
 		return
 	}
 
@@ -111,28 +112,19 @@ func helpRequestCommand(s disgord.Session, m *disgord.MessageCreate, requestType
 	err = tx.Create(req).Error
 	if err != nil {
 		log.Errorln("helpRequest: failed to create new request:", err)
-		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "An error occurred while creating your request.")
-		if err != nil {
-			log.Errorln("helpRequest: failed to send error message:", err)
-		}
+		replyMsg(s, m, "An error occurred while creating your request.")
 		return
 	}
 
 	pos, err = getPosInQueue(tx, m.Message.Author.ID)
 	if err != nil {
-		log.Errorln("helpRequest: failed to get pos in queue after creating request")
-		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "An error occurred while creating your request.")
-		if err != nil {
-			log.Errorln("helpReqest: failed to send error message:", err)
-		}
+		log.Errorln("helpRequest: failed to get pos in queue after creating request:", err)
+		replyMsg(s, m, "An error occurred while creating your request.")
 		return
 	}
 	tx.Commit()
 
-	_, _, err = m.Message.Author.SendMsgString(m.Ctx, s, fmt.Sprintf("A help request has been created, and you are at position %d in the queue.", pos))
-	if err != nil {
-		log.Errorln("helpRequest: failed to send response:", err)
-	}
+	replyMsg(s, m, fmt.Sprintf("A help request has been created, and you are at position %d in the queue.", pos))
 }
 
 func getPosInQueue(db *gorm.DB, userID disgord.Snowflake) (rowNumber int, err error) {
@@ -167,22 +159,13 @@ func cancelRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 		"done_at": time.Now(),
 	}).Error
 	if gorm.IsRecordNotFoundError(err) {
-		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "You do not have an active help request.")
-		if err != nil {
-			log.Errorln("Failed to send error message:", err)
-		}
+		replyMsg(s, m, "You do not have an active help request.")
 		return
 	} else if err != nil {
-		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "An unknown error occurred.")
-		if err != nil {
-			log.Errorln("Failed to send error message:", err)
-		}
+		replyMsg(s, m, "An unknown error occurred.")
 		return
 	}
-	_, _, err = m.Message.Author.SendMsgString(m.Ctx, s, "Your request was cancelled.")
-	if err != nil {
-		log.Errorln("Failed to send message:", err)
-	}
+	replyMsg(s, m, "Your request was cancelled.")
 }
 
 func nextRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
@@ -193,34 +176,90 @@ func nextRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 	err := tx.Where("done = ?", false).Order("created_at asc").First(&req).Error
 	if gorm.IsRecordNotFoundError(err) {
 		// TODO: set assitant in an idle state and notify when a new request arrives
-		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "There are no more requests in the queue.")
-		if err != nil {
-			log.Errorln("Failed to send error message:", err)
-		}
+		replyMsg(s, m, "There are no more requests in the queue.")
 		return
 	} else if err != nil {
 		log.Errorln("Failed to get next user:", err)
-		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "An unknown error occurred.")
-		if err != nil {
-			log.Errorln("Failed to send error message:", err)
-		}
+		replyMsg(s, m, "An unknown error occurred.")
 		return
 	}
 
-	tx.Delete(&req)
+	req.AssistantID = m.Message.Author.ID
+	req.Done = true
+	req.Reason = "assistantNext"
+	err = tx.Update(&req).Error
+	if err != nil {
+		log.Errorln("Failed to update request:", err)
+		replyMsg(s, m, "An error occurred while updating request.")
+		return
+	}
+
 	student, err := s.GetUser(m.Ctx, req.UserID)
 	if err != nil {
-		log.Errorln("Failed to fetch user")
-		_, _, err := m.Message.Author.SendMsgString(m.Ctx, s, "An unknown error occurred.")
-		if err != nil {
-			log.Errorln("Failed to send error message:", err)
-		}
+		log.Errorln("Failed to fetch user:", err)
+		replyMsg(s, m, "An unknown error occurred.")
 		return
 	}
-	_, _, err = m.Message.Author.SendMsgString(m.Ctx, s, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type, student.Tag()))
-	if err != nil {
-		log.Errorln("Failed to send message:", err)
-		return
-	}
+	replyMsg(s, m, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type, student.Tag()))
 	tx.Commit()
+}
+
+func lengthCommand(s disgord.Session, m *disgord.MessageCreate) {
+	var length int
+	err := db.Model(&HelpRequest{}).Where("done = ?", false).Count(&length).Error
+	if err != nil {
+		log.Errorln("Failed to count number of open requests:", err)
+		replyMsg(s, m, "An error occurred.")
+		return
+	}
+
+	var msg string
+	if length == 1 {
+		msg = "There is 1 student waiting for help."
+	} else {
+		msg = fmt.Sprintf("There are %d students waiting for help.", length)
+	}
+	replyMsg(s, m, msg)
+}
+
+func listCommand(s disgord.Session, m *disgord.MessageCreate) {
+	words := strings.Fields(m.Message.Content)
+	if len(words) < 2 {
+		replyMsg(s, m, "You must specify a number of requests to list.")
+		return
+	}
+
+	num, err := strconv.Atoi(words[1])
+	if err != nil {
+		replyMsg(s, m, fmt.Sprintf("'%s' is not a vaild number.", words[1]))
+		return
+	}
+
+	var sb strings.Builder
+	var requests []HelpRequest
+	err = db.Where("done = ?", false).Order("created_at asc").Limit(num).Find(&requests).Error
+	if err != nil {
+		log.Errorln("Failed to get requests:", err)
+		replyMsg(s, m, "Failed to get list of requests.")
+		return
+	}
+
+	if len(requests) == 0 {
+		replyMsg(s, m, "There are no open requests.")
+		return
+	}
+
+	fmt.Fprintf(&sb, "Showing the next %d requests:\n", len(requests))
+	sb.WriteString("```\n")
+	for i, req := range requests {
+		user, err := s.GetUser(m.Ctx, req.UserID)
+		if err != nil {
+			log.Errorln("Failed to obtain user info:", err)
+			replyMsg(s, m, "An error occurred while sending the message")
+			return
+		}
+		fmt.Fprintf(&sb, "%d. User: %s, Type: %s\n", i+1, user.Tag(), req.Type)
+	}
+	sb.WriteString("```")
+	replyMsg(s, m, sb.String())
 }

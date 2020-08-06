@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/andersfylling/disgord"
@@ -37,12 +38,24 @@ func discordMessageCreate(s disgord.Session, m *disgord.MessageCreate) {
 	if hasRoles(s, gm, cfg.StudentRole) {
 		if cmdFunc, ok := studentCommands[words[0]]; ok {
 			cmdFunc(s, m)
+			return
 		}
 	}
 
 	if hasRoles(s, gm, cfg.AssistantRole) {
 		if cmdFunc, ok := assistantCommands[words[0]]; ok {
 			cmdFunc(s, m)
+			return
 		}
+	}
+
+	ch, err := s.GetChannel(m.Ctx, m.Message.ChannelID)
+	if err != nil {
+		log.Errorln("Failed to get channel info:", err)
+	}
+
+	// if message is DM, then we will help the user. Otherwise, avoid spamming.
+	if ch.Type == disgord.ChannelTypeDM {
+		replyMsg(s, m, fmt.Sprintf("'%s' is not a recognized command. See %shelp for available commands.", words[0], cfg.Prefix))
 	}
 }
