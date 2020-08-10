@@ -168,13 +168,14 @@ func assignToIdleAssistant(ctx context.Context, s disgord.Session, db *gorm.DB, 
 	req.DoneAt = time.Now()
 	req.Reason = "assistantNext"
 
+	// need to do this update manually, as zero-valued struct fields are ignored
 	err = db.Model(&Assistant{}).Update("waiting", false).Error
 	if err != nil {
 		log.Errorln("Failed to update assistant status:", err)
 		return false
 	}
 
-	err = db.Update(&req).Error
+	err = db.Model(&HelpRequest{}).Update(&req).Error
 	if err != nil {
 		log.Errorln("Failed to update request:", err)
 		return false
@@ -254,6 +255,7 @@ func nextRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 	var req HelpRequest
 	err = tx.Where("done = ?", false).Order("created_at asc").First(&req).Error
 	if gorm.IsRecordNotFoundError(err) {
+		assistant.UserID = m.Message.Author.ID
 		assistant.Waiting = true
 		err := tx.Model(&Assistant{}).Update(&assistant).Error
 		if err != nil {
@@ -261,8 +263,10 @@ func nextRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 			replyMsg(s, m, "There are no more requests in the queue, but due to an error, you won't receive a notification when the next one arrives.")
 			return
 		}
-		// FIXIME: does not work
-		replyMsg(s, m, "There are no more requests in the queue. You will receive a message when the next request arrives.")
+		if !replyMsg(s, m, "There are no more requests in the queue. You will receive a message when the next request arrives.") {
+			return
+		}
+		tx.Commit()
 		return
 	} else if err != nil {
 		log.Errorln("Failed to get next user:", err)
