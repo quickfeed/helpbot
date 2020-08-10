@@ -34,19 +34,6 @@ var (
 	}
 )
 
-func replyMsg(s disgord.Session, m *disgord.MessageCreate, msg string) bool {
-	return sendMsg(m.Ctx, s, m.Message.Author, msg)
-}
-
-func sendMsg(ctx context.Context, s disgord.Session, u *disgord.User, msg string) bool {
-	_, _, err := u.SendMsgString(ctx, s, msg)
-	if err != nil {
-		log.Errorln("Sending message failed:", err)
-		return false
-	}
-	return true
-}
-
 var studentHelp = createTemplate("studentHelp", `Available commands:
 `+"```"+`
 {{.Prefix}}help:    Shows this help text
@@ -151,13 +138,13 @@ func assignToIdleAssistant(ctx context.Context, s disgord.Session, db *gorm.DB, 
 		return false
 	}
 
-	studUser, err := s.GetUser(ctx, req.UserID)
+	studUser, err := s.GetMember(ctx, cfg.Guild, req.UserID)
 	if err != nil {
 		log.Errorln("Failed to retrieve user info for student:", err)
 		return false
 	}
 
-	assistantUser, err := s.GetUser(ctx, req.Assistant.UserID)
+	assistantUser, err := s.GetMember(ctx, cfg.Guild, req.Assistant.UserID)
 	if err != nil {
 		log.Errorln("Failed to retrieve user info for assistant:", err)
 		return false
@@ -181,11 +168,11 @@ func assignToIdleAssistant(ctx context.Context, s disgord.Session, db *gorm.DB, 
 		return false
 	}
 
-	if !sendMsg(ctx, s, assistantUser, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type, studUser.Tag())) {
+	if !sendMsg(ctx, s, assistantUser.User, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type, getMemberName(studUser))) {
 		return false
 	}
 
-	if !sendMsg(ctx, s, studUser, fmt.Sprintf("You will now receive help from %s.", assistantUser.Tag())) {
+	if !sendMsg(ctx, s, studUser.User, fmt.Sprintf("You will now receive help from %s.", getMemberName(assistantUser))) {
 		return false
 	}
 
@@ -286,19 +273,26 @@ func nextRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 		return
 	}
 
-	student, err := s.GetUser(m.Ctx, req.UserID)
+	student, err := s.GetMember(m.Ctx, cfg.Guild, req.UserID)
 	if err != nil {
 		log.Errorln("Failed to fetch user:", err)
 		replyMsg(s, m, "An unknown error occurred.")
 		return
 	}
 
-	if !replyMsg(s, m, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type, student.Tag())) {
+	assistantMember, err := s.GetMember(m.Ctx, cfg.Guild, m.Message.Author.ID)
+	if err != nil {
+		log.Errorln("Failed to fetch user:", err)
+		replyMsg(s, m, "An unknown error occurred.")
 		return
 	}
 
-	// TODO: handle nicknames
-	sendMsg(m.Ctx, s, student, fmt.Sprintf("You will now receive help from %s", m.Message.Author.Tag()))
+	if !replyMsg(s, m, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type, getMemberName(student))) {
+		return
+	}
+
+	// TODO: getMemberName(handle)names
+	sendMsg(m.Ctx, s, student.User, fmt.Sprintf("You will now receive help from %s", getMemberName(assistantMember)))
 
 	tx.Commit()
 }
@@ -351,13 +345,13 @@ func listCommand(s disgord.Session, m *disgord.MessageCreate) {
 	fmt.Fprintf(&sb, "Showing the next %d requests:\n", len(requests))
 	sb.WriteString("```\n")
 	for i, req := range requests {
-		user, err := s.GetUser(m.Ctx, req.UserID)
+		user, err := s.GetMember(m.Ctx, cfg.Guild, req.UserID)
 		if err != nil {
 			log.Errorln("Failed to obtain user info:", err)
 			replyMsg(s, m, "An error occurred while sending the message")
 			return
 		}
-		fmt.Fprintf(&sb, "%d. User: %s, Type: %s\n", i+1, user.Tag(), req.Type)
+		fmt.Fprintf(&sb, "%d. User: %s, Type: %s\n", i+1, getMemberName(user), req.Type)
 	}
 	sb.WriteString("```")
 	replyMsg(s, m, sb.String())
