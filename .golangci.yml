@@ -1,5 +1,6 @@
 linters:
   disable:
+    # Annoying / too strict:
     - gochecknoglobals
     - godox
     - funlen
@@ -7,7 +8,11 @@ linters:
     - testpackage
     - wsl
     - lll
+    # Unrelated (http linters):
+    - bodyclose
+    - noctx
   presets:
     - bugs
+    - performance
     - style
     - unused
