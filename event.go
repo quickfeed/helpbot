@@ -35,14 +35,14 @@ func discordMessageCreate(s disgord.Session, m *disgord.MessageCreate) {
 		return
 	}
 
-	if hasRoles(s, gm, cfg.StudentRole) {
+	if hasRoles(gm, cfg.StudentRole) {
 		if cmdFunc, ok := studentCommands[words[0]]; ok {
 			cmdFunc(s, m)
 			return
 		}
 	}
 
-	if hasRoles(s, gm, cfg.AssistantRole) {
+	if hasRoles(gm, cfg.AssistantRole) {
 		if cmdFunc, ok := assistantCommands[words[0]]; ok {
 			cmdFunc(s, m)
 			return
@@ -56,6 +56,7 @@ func discordMessageCreate(s disgord.Session, m *disgord.MessageCreate) {
 
 	// if message is DM, then we will help the user. Otherwise, avoid spamming.
 	if ch.Type == disgord.ChannelTypeDM {
-		replyMsg(s, m, fmt.Sprintf("'%s' is not a recognized command. See %shelp for available commands.", words[0], cfg.Prefix))
+		replyMsg(s, m, fmt.Sprintf("'%s' is not a recognized command. See %shelp for available commands.",
+			words[0], cfg.Prefix))
 	}
 }

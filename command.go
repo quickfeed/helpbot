@@ -43,13 +43,13 @@ var studentHelp = createTemplate("studentHelp", `Available commands:
 `+"```"+`
 After requesting help, you can check the response message you got to see your position in the queue.
 You will receive a message when you are next in queue.
-Before you can be contacted by a teaching assitant, you must connect to the {{ch .LobbyChannel}} channel.
+Before you can be contacted by a teaching assistant, you must connect to the {{ch .LobbyChannel}} channel.
 `)
 
-var assitantHelp = createTemplate("assistantHelp", `Teaching Assistant commands:
+var assistant = createTemplate("assistantHelp", `Teaching Assistant commands:
 `+"```"+`
 {{.Prefix}}help:       Shows this help text
-{{.Prefix}}lenght:     Returns the number of students waiting for help.
+{{.Prefix}}length:     Returns the number of students waiting for help.
 {{.Prefix}}list <num>: Lists the next <num> students in the queue.
 {{.Prefix}}next:       Removes and returns the first student from the queue.
 {{.Prefix}}clear:      Clears the queue!
@@ -73,7 +73,7 @@ func studentHelpCommand(s disgord.Session, m *disgord.MessageCreate) {
 }
 
 func assistantHelpCommand(s disgord.Session, m *disgord.MessageCreate) {
-	err := helpCommand(s, m, assitantHelp)
+	err := helpCommand(s, m, assistant)
 	if err != nil {
 		log.Error(err)
 	}
@@ -134,7 +134,7 @@ func assignToIdleAssistant(ctx context.Context, s disgord.Session, db *gorm.DB, 
 	if gorm.IsRecordNotFoundError(err) {
 		return false
 	} else if err != nil {
-		log.Errorln("Failed to query for idle assitants:", err)
+		log.Errorln("Failed to query for idle assistants:", err)
 		return false
 	}
 
@@ -168,11 +168,13 @@ func assignToIdleAssistant(ctx context.Context, s disgord.Session, db *gorm.DB, 
 		return false
 	}
 
-	if !sendMsg(ctx, s, assistantUser.User, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type, getMemberName(studUser))) {
+	if !sendMsg(ctx, s, assistantUser.User, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type,
+		getMemberName(studUser))) {
 		return false
 	}
 
-	if !sendMsg(ctx, s, studUser.User, fmt.Sprintf("You will now receive help from %s.", getMemberName(assistantUser))) {
+	if !sendMsg(ctx, s, studUser.User, fmt.Sprintf("You will now receive help from %s.",
+		getMemberName(assistantUser))) {
 		return false
 	}
 
