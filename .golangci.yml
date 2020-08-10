@@ -11,8 +11,3 @@ linters:
     - bugs
     - style
     - unused
-
-linter-settings:
-  lll:
-    line-length: 120
-    tab-width: 4
