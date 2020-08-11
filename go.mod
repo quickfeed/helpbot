@@ -4,10 +4,7 @@ go 1.14
 
 require (
 	github.com/andersfylling/disgord v0.18.0
-	github.com/dghubble/gologin v2.1.0+incompatible
-	github.com/google/go-github v17.0.0+incompatible // indirect
 	github.com/google/go-github/v32 v32.1.0
-	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/jinzhu/gorm v1.9.15
 	github.com/sirupsen/logrus v1.2.0
 	github.com/spf13/pflag v1.0.5
