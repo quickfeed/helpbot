@@ -49,6 +49,11 @@ func discordMessageCreate(s disgord.Session, m *disgord.MessageCreate) {
 		}
 	}
 
+	if cmdFunc, ok := baseCommands[words[0]]; ok {
+		cmdFunc(s, m)
+		return
+	}
+
 	ch, err := s.GetChannel(m.Ctx, m.Message.ChannelID)
 	if err != nil {
 		log.Errorln("Failed to get channel info:", err)

@@ -14,7 +14,7 @@ var db *gorm.DB
 func initDB() (err error) {
 	dbPath := viper.GetString("db-path")
 	db, err = gorm.Open("sqlite3", dbPath)
-	db.AutoMigrate(&Assistant{}, &HelpRequest{})
+	db.AutoMigrate(&Student{}, &Assistant{}, &HelpRequest{})
 	return
 }
 
@@ -32,4 +32,11 @@ type HelpRequest struct {
 type Assistant struct {
 	UserID  disgord.Snowflake `gorm:"primary_key"`
 	Waiting bool
+}
+
+type Student struct {
+	UserID      disgord.Snowflake `gorm:"primary_key"`
+	GithubLogin string
+	Name        string
+	StudentID   string
 }

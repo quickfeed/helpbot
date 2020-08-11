@@ -34,6 +34,11 @@ func main() {
 	}
 	defer db.Close()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	initGithub(ctx)
+
 	client := disgord.New(disgord.Config{
 		BotToken: viper.GetString("token"),
 	})

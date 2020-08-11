@@ -19,6 +19,10 @@ type command func(s disgord.Session, m *disgord.MessageCreate)
 type commandMap map[string]command
 
 var (
+	baseCommands = commandMap{
+		"help":     baseHelpCommand,
+		"register": registerCommand,
+	}
 	studentCommands = commandMap{
 		"help":    studentHelpCommand,
 		"gethelp": func(s disgord.Session, m *disgord.MessageCreate) { helpRequestCommand(s, m, "help") },
@@ -33,6 +37,12 @@ var (
 		"clear":  clearCommand,
 	}
 )
+
+var baseHelp = createTemplate("baseHelp", `Available commands:
+`+"```"+`
+{{.Prefix}}help                       Shows this help text
+{{.Prefix}}register [github username] Register your discord account as a student.
+`+"```")
 
 var studentHelp = createTemplate("studentHelp", `Available commands:
 `+"```"+`
@@ -63,6 +73,13 @@ func helpCommand(s disgord.Session, m *disgord.MessageCreate, helpTmpl *template
 	}
 	replyMsg(s, m, buf.String())
 	return nil
+}
+
+func baseHelpCommand(s disgord.Session, m *disgord.MessageCreate) {
+	err := helpCommand(s, m, baseHelp)
+	if err != nil {
+		log.Error(err)
+	}
 }
 
 func studentHelpCommand(s disgord.Session, m *disgord.MessageCreate) {
@@ -383,4 +400,71 @@ func clearCommand(s disgord.Session, m *disgord.MessageCreate) {
 	}
 
 	replyMsg(s, m, "The queue was cleared.")
+}
+
+func registerCommand(s disgord.Session, m *disgord.MessageCreate) {
+	words := strings.Fields(m.Message.Content)
+	if len(words) < 2 {
+		replyMsg(s, m, "You must include your github username in the command.")
+		return
+	}
+
+	githubLogin := words[1]
+
+	membership, _, err := gh.Organizations.GetOrgMembership(m.Ctx, githubLogin, cfg.GitHubOrg)
+	if err != nil {
+		log.Infof("Failed to get org membership for user '%s': %v\n", githubLogin, err)
+		replyMsg(s, m,
+			"We were unable to verify that you are a member of the course's GitHub organization")
+		return
+	}
+
+	if membership.GetState() != "active" {
+		replyMsg(s, m, fmt.Sprintf(
+			"Please make sure that you have accepted the invitation to join the '%s' organization on GitHub",
+			cfg.GitHubOrg))
+		return
+	}
+
+	// TODO: query autograder for real name, using github login for now
+
+	// assign roles to student
+	gm, err := s.GetMember(m.Ctx, cfg.Guild, m.Message.Author.ID)
+	if err != nil {
+		log.Errorln("Failed to get member info:", err)
+		replyMsg(s, m, "An unknown error occurred")
+		return
+	}
+
+	student := Student{
+		UserID:      m.Message.Author.ID,
+		GithubLogin: githubLogin,
+		Name:        "", // TODO
+		StudentID:   "", // TODO
+	}
+
+	err = db.Create(&student).Error
+	if err != nil {
+		log.Errorln("Failed to store student in database:", err)
+		replyMsg(s, m, "An uknown error occurred.")
+		return
+	}
+
+	err = gm.UpdateNick(m.Ctx, s, membership.GetUser().GetName())
+	if err != nil {
+		log.Errorln("Failed to set nick:", err)
+		replyMsg(s, m, "An uknown error occurred")
+		return
+	}
+
+	err = s.AddGuildMemberRole(m.Ctx, cfg.Guild, m.Message.Author.ID, cfg.StudentRole)
+	if err != nil {
+		log.Errorln("Failed to add student role:", err)
+		replyMsg(s, m, "An uknown error occurred")
+		return
+	}
+
+	replyMsg(s, m, fmt.Sprintf(
+		"Authentication was successful! You should now have more access to the server. Type %shelp to see available commands",
+		cfg.Prefix))
 }

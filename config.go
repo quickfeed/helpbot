@@ -8,6 +8,7 @@ import (
 
 var cfg config
 
+// misc configuration that is not secret
 type config struct {
 	Prefix        string
 	Guild         disgord.Snowflake
@@ -15,11 +16,14 @@ type config struct {
 	LobbyChannel  disgord.Snowflake `mapstructure:"lobby-channel"`
 	StudentRole   disgord.Snowflake `mapstructure:"student-role"`
 	AssistantRole disgord.Snowflake `mapstructure:"assistant-role"`
+	GitHubOrg     string            `mapstructure:"gh-org"`
 }
 
 func initConfig() (err error) {
 	// command line
-	pflag.String("token", "", "Bot Token")
+	pflag.String("token", "", "Discord Bot Token")
+	pflag.String("gh-token", "", "GitHub token with access to the course's organization")
+	pflag.String("gh-org", "", "GitHub organization name")
 	pflag.String("db-path", "file::memory:?cache=shared", "Path to database file (defaults to in-memory)")
 	pflag.String("prefix", "!", "Prefix for all commands")
 	pflag.Uint64("guild", 0, "Guild ID")
