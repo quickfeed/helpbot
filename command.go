@@ -30,11 +30,12 @@ var (
 		"cancel":  cancelRequestCommand,
 	}
 	assistantCommands = commandMap{
-		"help":   assistantHelpCommand,
-		"length": lengthCommand,
-		"list":   listCommand,
-		"next":   nextRequestCommand,
-		"clear":  clearCommand,
+		"help":       assistantHelpCommand,
+		"length":     lengthCommand,
+		"list":       listCommand,
+		"next":       nextRequestCommand,
+		"clear":      clearCommand,
+		"unregister": unregisterCommand,
 	}
 )
 
@@ -63,11 +64,12 @@ Before you can be contacted by a teaching assistant, you must connect to the {{c
 
 var assistant = createTemplate("assistantHelp", `Teaching Assistant commands:
 `+"```"+`
-{{.Prefix}}help:       Shows this help text
-{{.Prefix}}length:     Returns the number of students waiting for help.
-{{.Prefix}}list <num>: Lists the next <num> students in the queue.
-{{.Prefix}}next:       Removes and returns the first student from the queue.
-{{.Prefix}}clear:      Clears the queue!
+{{.Prefix}}help:               Shows this help text
+{{.Prefix}}length:             Returns the number of students waiting for help.
+{{.Prefix}}list <num>:         Lists the next <num> students in the queue.
+{{.Prefix}}next:               Removes and returns the first student from the queue.
+{{.Prefix}}clear:              Clears the queue!
+{{.Prefix}}unregister @mention Unregisters the mentioned user.
 `+"```"+privacy)
 
 func helpCommand(s disgord.Session, m *disgord.MessageCreate, helpTmpl *template.Template) error {
@@ -472,4 +474,46 @@ func registerCommand(s disgord.Session, m *disgord.MessageCreate) {
 	replyMsg(s, m, fmt.Sprintf(
 		"Authentication was successful! You should now have more access to the server. Type %shelp to see available commands",
 		cfg.Prefix))
+}
+
+func unregisterCommand(s disgord.Session, m *disgord.MessageCreate) {
+	if len(m.Message.Mentions) < 1 {
+		replyMsg(s, m, "You must `@mention` a user to unregister.")
+		return
+	}
+
+	user := m.Message.Mentions[0]
+
+	// permanent deletion from db
+	err := db.Unscoped().Delete(&Student{}, "user_id = ?", user.ID).Error
+	if err != nil {
+		replyMsg(s, m, "Failed to delete user info.")
+		log.Errorln("Failed to delete student info:", err)
+		return
+	}
+
+	gm, err := s.GetMember(m.Ctx, cfg.Guild, user.ID)
+	if err != nil {
+		replyMsg(s, m, "Failed to get member info. You may have to remove role/nickname manually.")
+		log.Errorln("Failed to get member info:", err)
+		return
+	}
+
+	// clear nick
+	err = gm.UpdateNick(m.Ctx, s, "")
+	if err != nil {
+		replyMsg(s, m, "Failed to remove user nick. You may have to remove role/nickname manually.")
+		log.Errorln("Failed to remove user nick:", err)
+		return
+	}
+
+	// unassign role
+	err = s.RemoveGuildMemberRole(m.Ctx, cfg.Guild, user.ID, cfg.StudentRole)
+	if err != nil {
+		replyMsg(s, m, "Failed to remove user roles. You may have to remove role/nickname manually.")
+		log.Errorln("Failed to remove user roles:", err)
+		return
+	}
+
+	replyMsg(s, m, "User was unregistered.")
 }

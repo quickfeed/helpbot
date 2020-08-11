@@ -40,6 +40,7 @@ func discordMessageCreate(s disgord.Session, m *disgord.MessageCreate) {
 			cmdFunc(s, m)
 			return
 		}
+		goto reply
 	}
 
 	if hasRoles(gm, cfg.AssistantRole) {
@@ -47,6 +48,7 @@ func discordMessageCreate(s disgord.Session, m *disgord.MessageCreate) {
 			cmdFunc(s, m)
 			return
 		}
+		goto reply
 	}
 
 	if cmdFunc, ok := baseCommands[words[0]]; ok {
@@ -54,6 +56,7 @@ func discordMessageCreate(s disgord.Session, m *disgord.MessageCreate) {
 		return
 	}
 
+reply:
 	ch, err := s.GetChannel(m.Ctx, m.Message.ChannelID)
 	if err != nil {
 		log.Errorln("Failed to get channel info:", err)
