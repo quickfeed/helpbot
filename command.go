@@ -116,9 +116,9 @@ func helpRequestCommand(s disgord.Session, m *disgord.MessageCreate, requestType
 	}
 
 	req := HelpRequest{
-		UserID: m.Message.Author.ID,
-		Type:   requestType,
-		Done:   false,
+		StudentUserID: m.Message.Author.ID,
+		Type:          requestType,
+		Done:          false,
 	}
 
 	err = tx.Create(&req).Error
@@ -155,7 +155,7 @@ func assignToIdleAssistant(ctx context.Context, s disgord.Session, db *gorm.DB, 
 		return false
 	}
 
-	studUser, err := s.GetMember(ctx, cfg.Guild, req.UserID)
+	studUser, err := s.GetMember(ctx, cfg.Guild, req.StudentUserID)
 	if err != nil {
 		log.Errorln("Failed to retrieve user info for student:", err)
 		return false
@@ -205,14 +205,14 @@ func getPosInQueue(db *gorm.DB, userID disgord.Snowflake) (rowNumber int, err er
 				row_number () over (
 					order by created_at asc
 				) row_number,
-				user_id
+				student_user_id
 			from
 				help_requests
 			where
 				done = false
 		) t
 		where
-			user_id = ?`,
+			student_user_id = ?`,
 		userID,
 	).Row().Scan(&rowNumber)
 
@@ -292,7 +292,7 @@ func nextRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 		return
 	}
 
-	student, err := s.GetMember(m.Ctx, cfg.Guild, req.UserID)
+	student, err := s.GetMember(m.Ctx, cfg.Guild, req.StudentUserID)
 	if err != nil {
 		log.Errorln("Failed to fetch user:", err)
 		replyMsg(s, m, "An unknown error occurred.")
@@ -364,7 +364,7 @@ func listCommand(s disgord.Session, m *disgord.MessageCreate) {
 	fmt.Fprintf(&sb, "Showing the next %d requests:\n", len(requests))
 	sb.WriteString("```\n")
 	for i, req := range requests {
-		user, err := s.GetMember(m.Ctx, cfg.Guild, req.UserID)
+		user, err := s.GetMember(m.Ctx, cfg.Guild, req.StudentUserID)
 		if err != nil {
 			log.Errorln("Failed to obtain user info:", err)
 			replyMsg(s, m, "An error occurred while sending the message")

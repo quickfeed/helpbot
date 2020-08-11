@@ -20,7 +20,8 @@ func initDB() (err error) {
 
 type HelpRequest struct {
 	gorm.Model
-	UserID          disgord.Snowflake `gorm:"index"`
+	StudentUserID   disgord.Snowflake `gorm:"index"`
+	Student         Student
 	AssistantUserID disgord.Snowflake
 	Assistant       Assistant
 	Type            string `gorm:"index"`

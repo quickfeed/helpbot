@@ -23,10 +23,10 @@ func TestCreateAndRetrieveHelpRequests(t *testing.T) {
 	}
 	defer db.Close()
 
-	db.Create(&HelpRequest{UserID: 1, Done: true})
+	db.Create(&HelpRequest{StudentUserID: 1, Student: Student{}, Done: true})
 	var req HelpRequest
-	db.Find(&req, "user_id = ?", 1)
-	if req.UserID != 1 {
+	db.Find(&req, "student_user_id = ?", 1)
+	if req.StudentUserID != 1 {
 		t.Fatalf("Failed to create and retrieve users")
 	}
 }
@@ -39,10 +39,10 @@ func TestGetPosInQueue(t *testing.T) {
 	}
 	defer db.Close()
 
-	db.Create(&HelpRequest{UserID: 1})
-	db.Create(&HelpRequest{UserID: 2})
-	db.Create(&HelpRequest{UserID: 3, Done: true})
-	db.Create(&HelpRequest{UserID: 4})
+	db.Create(&HelpRequest{StudentUserID: 1, Student: Student{}})
+	db.Create(&HelpRequest{StudentUserID: 2, Student: Student{}})
+	db.Create(&HelpRequest{StudentUserID: 3, Student: Student{}, Done: true})
+	db.Create(&HelpRequest{StudentUserID: 4, Student: Student{}})
 
 	check := func(name disgord.Snowflake, want int) {
 		if pos, err := getPosInQueue(db, name); err != nil {
