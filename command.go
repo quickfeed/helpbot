@@ -38,11 +38,16 @@ var (
 	}
 )
 
+var privacy = `
+Data collection and privacy:
+By using this bot, you consent that your full name, student id, and discord id may be collected for the purposes of
+identifying you on this server. If you wish to delete your data, please contact a teaching assistant.`
+
 var baseHelp = createTemplate("baseHelp", `Available commands:
 `+"```"+`
 {{.Prefix}}help                       Shows this help text
 {{.Prefix}}register [github username] Register your discord account as a student.
-`+"```")
+`+"```"+privacy)
 
 var studentHelp = createTemplate("studentHelp", `Available commands:
 `+"```"+`
@@ -54,7 +59,7 @@ var studentHelp = createTemplate("studentHelp", `Available commands:
 After requesting help, you can check the response message you got to see your position in the queue.
 You will receive a message when you are next in queue.
 Before you can be contacted by a teaching assistant, you must connect to the {{ch .LobbyChannel}} channel.
-`)
+`+privacy)
 
 var assistant = createTemplate("assistantHelp", `Teaching Assistant commands:
 `+"```"+`
@@ -63,7 +68,7 @@ var assistant = createTemplate("assistantHelp", `Teaching Assistant commands:
 {{.Prefix}}list <num>: Lists the next <num> students in the queue.
 {{.Prefix}}next:       Removes and returns the first student from the queue.
 {{.Prefix}}clear:      Clears the queue!
-`+"```")
+`+"```"+privacy)
 
 func helpCommand(s disgord.Session, m *disgord.MessageCreate, helpTmpl *template.Template) error {
 	buf := new(strings.Builder)
