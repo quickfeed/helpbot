@@ -19,8 +19,8 @@ type config struct {
 	StudentRole   disgord.Snowflake `mapstructure:"student-role"`
 	AssistantRole disgord.Snowflake `mapstructure:"assistant-role"`
 	GitHubOrg     string            `mapstructure:"gh-org"`
-	CourseCode    string
-	CourseYear    uint32
+	CourseCode    string            `mapstructure:"course-code"`
+	CourseYear    uint32            `mapstructure:"course-year"`
 }
 
 func initConfig() (err error) {
