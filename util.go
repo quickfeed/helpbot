@@ -20,11 +20,3 @@ func sendMsg(ctx context.Context, s disgord.Session, u *disgord.User, msg string
 	}
 	return true
 }
-
-// returns member's nickname if present, username otherwise.
-func getMemberName(gm *disgord.Member) string {
-	if gm.Nick != "" {
-		return gm.Nick
-	}
-	return gm.User.Username
-}

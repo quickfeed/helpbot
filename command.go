@@ -196,12 +196,12 @@ func assignToIdleAssistant(ctx context.Context, s disgord.Session, db *gorm.DB, 
 	}
 
 	if !sendMsg(ctx, s, assistantUser.User, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type,
-		getMemberName(studUser))) {
+		studUser.Mention())) {
 		return false
 	}
 
 	if !sendMsg(ctx, s, studUser.User, fmt.Sprintf("You will now receive help from %s.",
-		getMemberName(assistantUser))) {
+		assistantUser.Mention())) {
 		return false
 	}
 
@@ -316,12 +316,11 @@ func nextRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 		return
 	}
 
-	if !replyMsg(s, m, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type, getMemberName(student))) {
+	if !replyMsg(s, m, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type, student.Mention())) {
 		return
 	}
 
-	// TODO: getMemberName(handle)names
-	sendMsg(m.Ctx, s, student.User, fmt.Sprintf("You will now receive help from %s", getMemberName(assistantMember)))
+	sendMsg(m.Ctx, s, student.User, fmt.Sprintf("You will now receive help from %s", assistantMember.Mention()))
 
 	tx.Commit()
 }
@@ -380,7 +379,7 @@ func listCommand(s disgord.Session, m *disgord.MessageCreate) {
 			replyMsg(s, m, "An error occurred while sending the message")
 			return
 		}
-		fmt.Fprintf(&sb, "%d. User: %s, Type: %s\n", i+1, getMemberName(user), req.Type)
+		fmt.Fprintf(&sb, "%d. User: %s, Type: %s\n", i+1, user.Mention(), req.Type)
 	}
 	sb.WriteString("```")
 	replyMsg(s, m, sb.String())
