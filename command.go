@@ -195,13 +195,13 @@ func assignToIdleAssistant(ctx context.Context, s disgord.Session, db *gorm.DB, 
 		return false
 	}
 
-	if !sendMsg(ctx, s, assistantUser.User, fmt.Sprintf("Next '%s' request is by %s.", req.Type,
-		studUser.Mention())) {
+	if !sendMsg(ctx, s, assistantUser.User, fmt.Sprintf("Next '%s' request is by %s", req.Type,
+		getMentionAndNick(studUser))) {
 		return false
 	}
 
 	if !sendMsg(ctx, s, studUser.User, fmt.Sprintf("You will now receive help from %s.",
-		assistantUser.Mention())) {
+		getMentionAndNick(assistantUser))) {
 		return false
 	}
 
@@ -316,11 +316,11 @@ func nextRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 		return
 	}
 
-	if !replyMsg(s, m, fmt.Sprintf("Next '%s' request is by %s.", req.Type, student.Mention())) {
+	if !replyMsg(s, m, fmt.Sprintf("Next '%s' request is by %s.", req.Type, getMentionAndNick(student))) {
 		return
 	}
 
-	sendMsg(m.Ctx, s, student.User, fmt.Sprintf("You will now receive help from %s", assistantMember.Mention()))
+	sendMsg(m.Ctx, s, student.User, fmt.Sprintf("You will now receive help from %s", getMentionAndNick(assistantMember)))
 
 	tx.Commit()
 }
@@ -370,8 +370,7 @@ func listCommand(s disgord.Session, m *disgord.MessageCreate) {
 		return
 	}
 
-	fmt.Fprintf(&sb, "Showing the next %d requests:\n", len(requests))
-	sb.WriteString("```\n")
+	fmt.Fprintf(&sb, "Showing the next %d requests:\n\n", len(requests))
 	for i, req := range requests {
 		user, err := s.GetMember(m.Ctx, cfg.Guild, req.StudentUserID)
 		if err != nil {
@@ -379,9 +378,8 @@ func listCommand(s disgord.Session, m *disgord.MessageCreate) {
 			replyMsg(s, m, "An error occurred while sending the message")
 			return
 		}
-		fmt.Fprintf(&sb, "%d. User: %s, Type: %s\n", i+1, user.Mention(), req.Type)
+		fmt.Fprintf(&sb, "%d. User: %s, Type: %s\n", i+1, getMentionAndNick(user), req.Type)
 	}
-	sb.WriteString("```")
 	replyMsg(s, m, sb.String())
 }
 

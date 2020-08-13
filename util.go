@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/andersfylling/disgord"
 )
@@ -19,4 +20,12 @@ func sendMsg(ctx context.Context, s disgord.Session, u *disgord.User, msg string
 		return false
 	}
 	return true
+}
+
+// returns member's nickname if present, username otherwise.
+func getMentionAndNick(gm *disgord.Member) string {
+	if gm.Nick != "" {
+		return fmt.Sprintf("%s (%s)", gm.Mention(), gm.Nick)
+	}
+	return gm.Mention()
 }
