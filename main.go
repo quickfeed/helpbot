@@ -22,6 +22,8 @@ var log = &logrus.Logger{
 	Level:     logrus.ErrorLevel,
 }
 
+var ag *Autograder
+
 func main() {
 	err := initConfig()
 	if err != nil {
@@ -39,6 +41,13 @@ func main() {
 
 	initGithub(ctx)
 
+	if viper.GetBool("autograder") {
+		ag, err = NewAutograder()
+		if err != nil {
+			log.Fatalln("Failed to init autograder:", err)
+		}
+	}
+
 	client := disgord.New(disgord.Config{
 		BotToken: viper.GetString("token"),
 	})
@@ -50,6 +59,9 @@ func main() {
 		if err != nil {
 			log.Errorln("Discord exited with error:", err)
 		}
+
+		// cleanup
+		ag.Close()
 	}()
 
 	client.Ready(func() {

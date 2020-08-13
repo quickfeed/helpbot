@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	"github.com/andersfylling/disgord"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -8,7 +10,7 @@ import (
 
 var cfg config
 
-// misc configuration that is not secret
+// misc configuration that is not secret.
 type config struct {
 	Prefix        string
 	Guild         disgord.Snowflake
@@ -17,6 +19,8 @@ type config struct {
 	StudentRole   disgord.Snowflake `mapstructure:"student-role"`
 	AssistantRole disgord.Snowflake `mapstructure:"assistant-role"`
 	GitHubOrg     string            `mapstructure:"gh-org"`
+	CourseCode    string
+	CourseYear    uint32
 }
 
 func initConfig() (err error) {
@@ -31,6 +35,10 @@ func initConfig() (err error) {
 	pflag.Uint64("lobby-channel", 0, "Voice channel to direct users to")
 	pflag.Uint64("student-role", 0, "Role ID for students")
 	pflag.Uint64("assistant-role", 0, "Role ID for teaching assistants")
+	pflag.String("course-code", "", "The code for the course")
+	pflag.Uint32("course-year", uint32(time.Now().Year()), "The year of the course")
+	pflag.Bool("autograder", false, "If true, the bot will query autograder for user info.")
+	pflag.Int("autograder-user-id", 0, "The ID of the autograder user to use.")
 	pflag.Parse()
 
 	err = viper.BindPFlags(pflag.CommandLine)

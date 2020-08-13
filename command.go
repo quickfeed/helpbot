@@ -11,7 +11,10 @@ import (
 	"time"
 
 	"github.com/andersfylling/disgord"
+	agpb "github.com/autograde/quickfeed/ag"
 	"github.com/jinzhu/gorm"
+	"github.com/spf13/viper"
+	"google.golang.org/grpc/metadata"
 )
 
 type command func(s disgord.Session, m *disgord.MessageCreate)
@@ -433,7 +436,30 @@ func registerCommand(s disgord.Session, m *disgord.MessageCreate) {
 		return
 	}
 
+	student := Student{
+		UserID:      m.Message.Author.ID,
+		GithubLogin: githubLogin,
+	}
+
 	// TODO: query autograder for real name, using github login for now
+	if viper.GetBool("autograder") {
+		ctx, cancel := context.WithTimeout(m.Ctx, 1*time.Second)
+		defer cancel()
+		ctx = metadata.NewOutgoingContext(ctx, GetAGMetadata())
+		req := &agpb.CourseUserRequest{
+			CourseCode: cfg.CourseCode,
+			CourseYear: cfg.CourseYear,
+			UserLogin:  githubLogin,
+		}
+		userInfo, err := ag.GetUserByCourse(ctx, req)
+		if err != nil {
+			log.Errorln("Failed to get info from autograder:", err)
+			replyMsg(s, m, "Failed to communicate with autograder")
+			return
+		}
+		student.Name = userInfo.GetName()
+		student.StudentID = userInfo.GetStudentID()
+	}
 
 	// assign roles to student
 	gm, err := s.GetMember(m.Ctx, cfg.Guild, m.Message.Author.ID)
@@ -443,13 +469,6 @@ func registerCommand(s disgord.Session, m *disgord.MessageCreate) {
 		return
 	}
 
-	student := Student{
-		UserID:      m.Message.Author.ID,
-		GithubLogin: githubLogin,
-		Name:        "", // TODO
-		StudentID:   "", // TODO
-	}
-
 	err = db.Create(&student).Error
 	if err != nil {
 		log.Errorln("Failed to store student in database:", err)
@@ -457,7 +476,7 @@ func registerCommand(s disgord.Session, m *disgord.MessageCreate) {
 		return
 	}
 
-	err = gm.UpdateNick(m.Ctx, s, membership.GetUser().GetName())
+	err = gm.UpdateNick(m.Ctx, s, student.Name)
 	if err != nil {
 		log.Errorln("Failed to set nick:", err)
 		replyMsg(s, m, "An uknown error occurred")
