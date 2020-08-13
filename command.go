@@ -195,7 +195,7 @@ func assignToIdleAssistant(ctx context.Context, s disgord.Session, db *gorm.DB, 
 		return false
 	}
 
-	if !sendMsg(ctx, s, assistantUser.User, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type,
+	if !sendMsg(ctx, s, assistantUser.User, fmt.Sprintf("Next '%s' request is by %s.", req.Type,
 		studUser.Mention())) {
 		return false
 	}
@@ -316,7 +316,7 @@ func nextRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 		return
 	}
 
-	if !replyMsg(s, m, fmt.Sprintf("Next '%s' request is by '%s'.", req.Type, student.Mention())) {
+	if !replyMsg(s, m, fmt.Sprintf("Next '%s' request is by %s.", req.Type, student.Mention())) {
 		return
 	}
 
