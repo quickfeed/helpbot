@@ -420,7 +420,7 @@ func registerCommand(s disgord.Session, m *disgord.MessageCreate) {
 
 	// only allow one user per github login
 	var count int
-	err := db.Model(&Student{}).Where("github-login = ?", githubLogin).Count(&count).Error
+	err := db.Model(&Student{}).Where("github_login = ?", githubLogin).Count(&count).Error
 	if err != nil {
 		log.Errorln("Failed to check for existing user:", err)
 		replyMsg(s, m, "An unknown error occurred.")
