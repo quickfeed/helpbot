@@ -39,6 +39,7 @@ var (
 		"next":       nextRequestCommand,
 		"clear":      clearCommand,
 		"unregister": unregisterCommand,
+		"cancel":     assistantCancelCommand,
 	}
 )
 
@@ -73,6 +74,7 @@ var assistant = createTemplate("assistantHelp", `Teaching Assistant commands:
 {{.Prefix}}next:               Removes and returns the first student from the queue.
 {{.Prefix}}clear:              Clears the queue!
 {{.Prefix}}unregister @mention Unregisters the mentioned user.
+{{.Prefix}}cancel              Cancels your 'waiting' status.
 `+"```"+privacy)
 
 func helpCommand(s disgord.Session, m *disgord.MessageCreate, helpTmpl *template.Template) error {
@@ -546,4 +548,33 @@ func unregisterCommand(s disgord.Session, m *disgord.MessageCreate) {
 	}
 
 	replyMsg(s, m, "User was unregistered.")
+}
+
+func assistantCancelCommand(s disgord.Session, m *disgord.MessageCreate) {
+	tx := db.Begin()
+	defer tx.RollbackUnlessCommitted()
+
+	var assistant Assistant
+	err := tx.Where("user_id = ?", m.Message.Author.ID).First(&assistant).Error
+	if err != nil {
+		log.Errorln("Failed to get assistant from DB:", err)
+		replyMsg(s, m, "An unknown error occurred")
+		return
+	}
+
+	if !assistant.Waiting {
+		replyMsg(s, m, "You were not marked as waiting, so no action was taken.")
+		return
+	}
+
+	err = tx.Where("user_id = ?", m.Message.Author.ID).UpdateColumn("waiting", false).Error
+	if err != nil {
+		log.Errorln("Failed to update status in DB:", err)
+		replyMsg(s, m, "An unknown error occurred when attempting to update waiting status.")
+		return
+	}
+
+	tx.Commit()
+
+	replyMsg(s, m, fmt.Sprintf("Your waiting status was removed (you will have to use %snext again to get the next student)", cfg.Prefix))
 }
