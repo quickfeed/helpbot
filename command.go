@@ -567,7 +567,7 @@ func assistantCancelCommand(s disgord.Session, m *disgord.MessageCreate) {
 		return
 	}
 
-	err = tx.Where("user_id = ?", m.Message.Author.ID).UpdateColumn("waiting", false).Error
+	err = tx.Model(&Assistant{}).Where("user_id = ?", m.Message.Author.ID).UpdateColumn("waiting", false).Error
 	if err != nil {
 		log.Errorln("Failed to update status in DB:", err)
 		replyMsg(s, m, "An unknown error occurred when attempting to update waiting status.")
