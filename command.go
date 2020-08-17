@@ -418,6 +418,20 @@ func registerCommand(s disgord.Session, m *disgord.MessageCreate) {
 
 	githubLogin := words[1]
 
+	// only allow one user per github login
+	var count int
+	err := db.Model(&Student{}).Where("github-login = ?", githubLogin).Count(&count).Error
+	if err != nil {
+		log.Errorln("Failed to check for existing user:", err)
+		replyMsg(s, m, "An unknown error occurred.")
+		return
+	}
+
+	if count > 0 {
+		replyMsg(s, m, "That github login has already been used to register! If you believe that this is a mistake, please contact a teaching assistant.")
+		return
+	}
+
 	membership, _, err := gh.Organizations.GetOrgMembership(m.Ctx, githubLogin, cfg.GitHubOrg)
 	if err != nil {
 		log.Infof("Failed to get org membership for user '%s': %v\n", githubLogin, err)
