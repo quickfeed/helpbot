@@ -236,7 +236,7 @@ func getPosInQueue(db *gorm.DB, userID disgord.Snowflake) (rowNumber int, err er
 }
 
 func cancelRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
-	err := db.Model(&HelpRequest{}).Where("user_id = ?", m.Message.Author.ID).Updates(map[string]interface{}{
+	err := db.Model(&HelpRequest{}).Where("student_user_id = ?", m.Message.Author.ID).Updates(map[string]interface{}{
 		"done":    true,
 		"reason":  "userCancel",
 		"done_at": time.Now(),
