@@ -347,15 +347,16 @@ func lengthCommand(s disgord.Session, m *disgord.MessageCreate) {
 
 func listCommand(s disgord.Session, m *disgord.MessageCreate) {
 	words := strings.Fields(m.Message.Content)
-	if len(words) < 2 {
-		replyMsg(s, m, "You must specify a number of requests to list.")
-		return
-	}
 
-	num, err := strconv.Atoi(words[1])
-	if err != nil {
-		replyMsg(s, m, fmt.Sprintf("'%s' is not a vaild number.", words[1]))
-		return
+	num := 10
+	var err error
+
+	if len(words) >= 2 {
+		num, err = strconv.Atoi(words[1])
+		if err != nil {
+			replyMsg(s, m, fmt.Sprintf("'%s' is not a vaild number.", words[1]))
+			return
+		}
 	}
 
 	var sb strings.Builder
