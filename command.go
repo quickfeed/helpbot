@@ -159,7 +159,7 @@ func helpRequestCommand(s disgord.Session, m *disgord.MessageCreate, requestType
 // assignToIdleAssistant will check if any assistants are waiting for a request and pick one of them to handle req.
 // db must be a transaction.
 func assignToIdleAssistant(ctx context.Context, s disgord.Session, db *gorm.DB, req HelpRequest) bool {
-	err := db.Where("waiting = ?", true).Take(&req.Assistant).Error
+	err := db.Where("waiting = ?", true).Order("last_request ASC").First(&req.Assistant).Error
 	if gorm.IsRecordNotFoundError(err) {
 		return false
 	} else if err != nil {
@@ -179,13 +179,17 @@ func assignToIdleAssistant(ctx context.Context, s disgord.Session, db *gorm.DB, 
 		return false
 	}
 
+	req.Assistant.LastRequest = time.Now()
 	req.Assistant.Waiting = false
 	req.Done = true
-	req.DoneAt = time.Now()
+	req.DoneAt = req.Assistant.LastRequest
 	req.Reason = "assistantNext"
 
-	// need to do this update manually, as zero-valued struct fields are ignored
-	err = db.Model(&Assistant{}).Update("waiting", false).Error
+	// need to do this update assistant manually, as zero-valued struct fields are ignored
+	err = db.Model(&Assistant{}).UpdateColumns(map[string]interface{}{
+		"waiting":      req.Assistant.Waiting,
+		"last_request": req.Assistant.LastRequest,
+	}).Error
 	if err != nil {
 		log.Errorln("Failed to update assistant status:", err)
 		return false
@@ -293,14 +297,22 @@ func nextRequestCommand(s disgord.Session, m *disgord.MessageCreate) {
 	}
 
 	req.Assistant = assistant
+	req.Assistant.LastRequest = time.Now()
 	req.Done = true
-	req.DoneAt = time.Now()
+	req.DoneAt = req.Assistant.LastRequest
 	req.Reason = "assistantNext"
 
 	err = tx.Model(&HelpRequest{}).Update(&req).Error
 	if err != nil {
 		log.Errorln("Failed to update request:", err)
 		replyMsg(s, m, "An error occurred while updating request.")
+		return
+	}
+
+	err = tx.Model(&Assistant{}).Update(&req.Assistant).Error
+	if err != nil {
+		log.Errorln("Failed to update assistant:", err)
+		replyMsg(s, m, "An error occurred while updating assistant status.")
 		return
 	}
 

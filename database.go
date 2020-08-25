@@ -31,8 +31,9 @@ type HelpRequest struct {
 }
 
 type Assistant struct {
-	UserID  disgord.Snowflake `gorm:"primary_key"`
-	Waiting bool
+	UserID      disgord.Snowflake `gorm:"primary_key"`
+	Waiting     bool
+	LastRequest time.Time
 }
 
 type Student struct {
