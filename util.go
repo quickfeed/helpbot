@@ -22,10 +22,11 @@ func sendMsg(ctx context.Context, s disgord.Session, u *disgord.User, msg string
 	return true
 }
 
-// returns member's nickname if present, username otherwise.
+// returns mention plus member's nickname if present, username otherwise.
 func getMentionAndNick(gm *disgord.Member) string {
+	name := gm.User.Username
 	if gm.Nick != "" {
-		return fmt.Sprintf("%s (%s)", gm.Mention(), gm.Nick)
+		name = gm.Nick
 	}
-	return gm.Mention()
+	return fmt.Sprintf("%s (%s)", gm.Mention(), name)
 }
