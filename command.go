@@ -186,7 +186,7 @@ func assignToIdleAssistant(ctx context.Context, s disgord.Session, db *gorm.DB, 
 	req.Reason = "assistantNext"
 
 	// need to do this update assistant manually, as zero-valued struct fields are ignored
-	err = db.Model(&Assistant{}).UpdateColumns(map[string]interface{}{
+	err = db.Model(&Assistant{}).Where("user_id = ?", req.Assistant.UserID).UpdateColumns(map[string]interface{}{
 		"waiting":      req.Assistant.Waiting,
 		"last_request": req.Assistant.LastRequest,
 	}).Error
