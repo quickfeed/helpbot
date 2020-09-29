@@ -61,7 +61,9 @@ func main() {
 		}
 
 		// cleanup
-		ag.Close()
+		if ag != nil {
+			ag.Close()
+		}
 	}()
 
 	client.Ready(func() {
