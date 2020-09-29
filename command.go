@@ -31,6 +31,7 @@ var (
 		"gethelp": func(s disgord.Session, m *disgord.MessageCreate) { helpRequestCommand(s, m, "help") },
 		"approve": func(s disgord.Session, m *disgord.MessageCreate) { helpRequestCommand(s, m, "approve") },
 		"cancel":  cancelRequestCommand,
+		"status":  studentStatusCommand,
 	}
 	assistantCommands = commandMap{
 		"help":       assistantHelpCommand,
@@ -58,8 +59,9 @@ var studentHelp = createTemplate("studentHelp", `Available commands:
 `+"```"+`
 {{.Prefix}}help:    Shows this help text
 {{.Prefix}}gethelp: Request help from a teaching assistant
-{{.Prefix}}approve:  Get your lab approved by a teaching assistant
+{{.Prefix}}approve: Get your lab approved by a teaching assistant
 {{.Prefix}}cancel:  Cancels your help request and removes you from the queue
+{{.Prefix}}status:  Show your position in the queue
 `+"```"+`
 After requesting help, you can check the response message you got to see your position in the queue.
 You will receive a message when you are next in queue.
@@ -154,6 +156,20 @@ func helpRequestCommand(s disgord.Session, m *disgord.MessageCreate, requestType
 	tx.Commit()
 
 	replyMsg(s, m, fmt.Sprintf("A help request has been created, and you are at position %d in the queue.", pos))
+}
+
+func studentStatusCommand(s disgord.Session, m *disgord.MessageCreate) {
+	pos, err := getPosInQueue(db, m.Message.Author.ID)
+	if err != nil {
+		log.Errorln("studentStatus: failed to get position in queue:", err)
+		replyMsg(s, m, "An error occurred.")
+		return
+	}
+	if pos <= 0 {
+		replyMsg(s, m, "You are not in the queue.")
+		return
+	}
+	replyMsg(s, m, fmt.Sprintf("You are at position %d in the queue.", pos))
 }
 
 // assignToIdleAssistant will check if any assistants are waiting for a request and pick one of them to handle req.
