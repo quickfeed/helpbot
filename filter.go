@@ -1,4 +1,4 @@
-package main
+package helpbot
 
 import "github.com/andersfylling/disgord"
 

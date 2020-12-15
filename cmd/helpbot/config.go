@@ -3,24 +3,12 @@ package main
 import (
 	"time"
 
-	"github.com/andersfylling/disgord"
+	"github.com/Raytar/helpbot"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
-var cfg config
-
-// misc configuration that is not secret.
-type config struct {
-	Prefix        string
-	Guild         disgord.Snowflake
-	LobbyChannel  disgord.Snowflake `mapstructure:"lobby-channel"`
-	StudentRole   disgord.Snowflake `mapstructure:"student-role"`
-	AssistantRole disgord.Snowflake `mapstructure:"assistant-role"`
-	GitHubOrg     string            `mapstructure:"gh-org"`
-	CourseCode    string            `mapstructure:"course-code"`
-	CourseYear    uint32            `mapstructure:"course-year"`
-}
+var cfg helpbot.Config
 
 func initConfig() (err error) {
 	// command line

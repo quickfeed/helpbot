@@ -1,4 +1,4 @@
-package main
+package helpbot
 
 import (
 	"fmt"
@@ -6,23 +6,25 @@ import (
 	"testing"
 
 	"github.com/andersfylling/disgord"
-	"github.com/spf13/viper"
+	"github.com/jinzhu/gorm"
 )
 
+var db *gorm.DB
+
 func TestMain(m *testing.M) {
-	viper.Set("db-path", "file::memory:?cache=shared")
+	var err error
+	db, err = OpenDatabase("file::memory:?cache=shared")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	// viper.Set("db-path", "test.db")
-	os.Exit(m.Run())
+	ret := m.Run()
+	db.Close()
+	os.Exit(ret)
 }
 
 func TestCreateAndRetrieveHelpRequests(t *testing.T) {
-	err := initDB()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to init DB:", err)
-		os.Exit(1)
-	}
-	defer db.Close()
-
 	db.Create(&HelpRequest{StudentUserID: 1, Student: Student{}, Done: true})
 	var req HelpRequest
 	db.Find(&req, "student_user_id = ?", 1)
@@ -32,13 +34,6 @@ func TestCreateAndRetrieveHelpRequests(t *testing.T) {
 }
 
 func TestGetPosInQueue(t *testing.T) {
-	err := initDB()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to init DB:", err)
-		os.Exit(1)
-	}
-	defer db.Close()
-
 	db.Create(&HelpRequest{StudentUserID: 1, Student: Student{}})
 	db.Create(&HelpRequest{StudentUserID: 2, Student: Student{}})
 	db.Create(&HelpRequest{StudentUserID: 3, Student: Student{}, Done: true})

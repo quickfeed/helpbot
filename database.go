@@ -1,19 +1,15 @@
-package main
+package helpbot
 
 import (
 	"time"
 
 	"github.com/andersfylling/disgord"
 	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	"github.com/spf13/viper"
+	_ "github.com/jinzhu/gorm/dialects/sqlite" // for sqlite support
 )
 
-var db *gorm.DB
-
-func initDB() (err error) {
-	dbPath := viper.GetString("db-path")
-	db, err = gorm.Open("sqlite3", dbPath)
+func OpenDatabase(path string) (db *gorm.DB, err error) {
+	db, err = gorm.Open("sqlite3", path)
 	db.AutoMigrate(&Student{}, &Assistant{}, &HelpRequest{})
 	return
 }

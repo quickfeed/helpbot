@@ -1,10 +1,11 @@
-package main
+package helpbot
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/andersfylling/disgord"
+	"github.com/prometheus/common/log"
 )
 
 // replyMsg sends a direct message response to the author of the message.
