@@ -9,6 +9,9 @@ linters:
     - wsl
     - lll
     - nlreturn
+    - exhaustivestruct
+    - wrapcheck
+    - gocritic
     # Unrelated (http linters):
     - bodyclose
     - noctx
