@@ -14,7 +14,6 @@ var cfg config
 type config struct {
 	Prefix        string
 	Guild         disgord.Snowflake
-	HelpChannel   disgord.Snowflake `mapstructure:"help-channel"`
 	LobbyChannel  disgord.Snowflake `mapstructure:"lobby-channel"`
 	StudentRole   disgord.Snowflake `mapstructure:"student-role"`
 	AssistantRole disgord.Snowflake `mapstructure:"assistant-role"`
@@ -31,7 +30,6 @@ func initConfig() (err error) {
 	pflag.String("db-path", "file::memory:?cache=shared", "Path to database file (defaults to in-memory)")
 	pflag.String("prefix", "!", "Prefix for all commands")
 	pflag.Uint64("guild", 0, "Guild ID")
-	pflag.Uint64("help-channel", 0, "Text channel to serve")
 	pflag.Uint64("lobby-channel", 0, "Voice channel to direct users to")
 	pflag.Uint64("student-role", 0, "Role ID for students")
 	pflag.Uint64("assistant-role", 0, "Role ID for teaching assistants")
