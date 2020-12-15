@@ -49,10 +49,15 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	bot := helpbot.New(cfg, db, log, ag)
-	err = bot.Connect(ctx)
-	if err != nil {
-		log.Fatalf("Failed to connect: %v", err)
+	var bots []*helpbot.HelpBot
+
+	for _, c := range cfg {
+		bot := helpbot.New(c, db, log, ag)
+		err = bot.Connect(ctx)
+		if err != nil {
+			log.Fatalf("Failed to connect: %v", err)
+		}
+		bots = append(bots, bot)
 	}
 
 	// run until interrupted
@@ -62,7 +67,9 @@ func main() {
 
 	// cleanup
 	if ag != nil {
-		bot.Disconnect()
+		for _, b := range bots {
+			b.Disconnect()
+		}
 		cancel()
 		ag.Close()
 	}

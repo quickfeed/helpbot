@@ -1,30 +1,16 @@
 package main
 
 import (
-	"time"
-
 	"github.com/Raytar/helpbot"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
-var cfg helpbot.Config
+var cfg []helpbot.Config
 
 func initConfig() (err error) {
 	// command line
-	pflag.String("token", "", "Discord Bot Token")
-	pflag.String("gh-token", "", "GitHub token with access to the course's organization")
-	pflag.String("gh-org", "", "GitHub organization name")
 	pflag.String("db-path", "file::memory:?cache=shared", "Path to database file (defaults to in-memory)")
-	pflag.String("prefix", "!", "Prefix for all commands")
-	pflag.Uint64("guild", 0, "Guild ID")
-	pflag.Uint64("lobby-channel", 0, "Voice channel to direct users to")
-	pflag.Uint64("student-role", 0, "Role ID for students")
-	pflag.Uint64("assistant-role", 0, "Role ID for teaching assistants")
-	pflag.String("course-code", "", "The code for the course")
-	pflag.Uint32("course-year", uint32(time.Now().Year()), "The year of the course")
-	pflag.Bool("autograder", false, "If true, the bot will query autograder for user info.")
-	pflag.Int("autograder-user-id", 0, "The ID of the autograder user to use.")
 	pflag.Parse()
 
 	err = viper.BindPFlags(pflag.CommandLine)
@@ -45,6 +31,6 @@ func initConfig() (err error) {
 		return
 	}
 
-	err = viper.Unmarshal(&cfg)
+	err = viper.UnmarshalKey("instances", &cfg)
 	return
 }
