@@ -7,7 +7,6 @@ import (
 	"syscall"
 
 	"github.com/Raytar/helpbot"
-	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -25,19 +24,12 @@ var log = &logrus.Logger{
 }
 
 var ag *helpbot.Autograder
-var db *gorm.DB
 
 func main() {
 	err := initConfig()
 	if err != nil {
 		log.Fatalln("Failed to read config:", err)
 	}
-
-	db, err = helpbot.OpenDatabase(viper.GetString("db-path"))
-	if err != nil {
-		log.Fatalln("Failed to init database:", err)
-	}
-	defer db.Close()
 
 	if viper.GetBool("autograder") {
 		ag, err = helpbot.NewAutograder(viper.GetInt("autograder-user-id"))
@@ -52,7 +44,10 @@ func main() {
 	var bots []*helpbot.HelpBot
 
 	for _, c := range cfg {
-		bot := helpbot.New(c, db, log, ag)
+		bot, err := helpbot.New(c, log, ag)
+		if err != nil {
+			log.Fatalf("Failed to initialize bot: %v", err)
+		}
 		err = bot.Connect(ctx)
 		if err != nil {
 			log.Fatalf("Failed to connect: %v", err)

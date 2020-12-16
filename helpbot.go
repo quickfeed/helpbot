@@ -11,10 +11,11 @@ import (
 )
 
 type Config struct {
-	Token         string
-	GHToken       string
-	Prefix        string
-	Guild         disgord.Snowflake
+	Token         string            `mapstructure:"token"`
+	DBPath        string            `mapstructure:"db-path"`
+	GHToken       string            `mapstructure:"gh-token"`
+	Prefix        string            `mapstructure:"prefix"`
+	Guild         disgord.Snowflake `mapstructure:"guild"`
 	LobbyChannel  disgord.Snowflake `mapstructure:"lobby-channel"`
 	StudentRole   disgord.Snowflake `mapstructure:"student-role"`
 	AssistantRole disgord.Snowflake `mapstructure:"assistant-role"`
@@ -46,9 +47,14 @@ func (bot *HelpBot) Disconnect() error {
 	return bot.client.Disconnect()
 }
 
-func New(cfg Config, db *gorm.DB, log *logrus.Logger, ag *Autograder) *HelpBot {
-	bot := &HelpBot{cfg: cfg, db: db, log: log, ag: ag}
+func New(cfg Config, log *logrus.Logger, ag *Autograder) (bot *HelpBot, err error) {
+	bot = &HelpBot{cfg: cfg, log: log, ag: ag}
 	bot.client = disgord.New(disgord.Config{BotToken: cfg.Token})
+	bot.db, err = OpenDatabase(cfg.DBPath)
+	if err != nil {
+		return nil, err
+	}
+
 	bot.initCommands()
 	bot.initEvents()
 
@@ -59,5 +65,5 @@ func New(cfg Config, db *gorm.DB, log *logrus.Logger, ag *Autograder) *HelpBot {
 		}
 	})
 
-	return bot
+	return bot, nil
 }
