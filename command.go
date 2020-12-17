@@ -483,7 +483,7 @@ func (bot *HelpBot) registerCommand(m *disgord.MessageCreate) {
 	}
 
 	// TODO: query autograder for real name, using github login for now
-	if bot.ag != nil {
+	if bot.cfg.Autograder {
 		ctx, cancel := context.WithTimeout(m.Ctx, 1*time.Second)
 		defer cancel()
 		ctx = metadata.NewOutgoingContext(ctx, bot.ag.md)

@@ -22,6 +22,7 @@ type Config struct {
 	GitHubOrg     string            `mapstructure:"gh-org"`
 	CourseCode    string            `mapstructure:"course-code"`
 	CourseYear    uint32            `mapstructure:"course-year"`
+	Autograder    bool              `mapstructure:"autograder"`
 }
 
 type HelpBot struct {
