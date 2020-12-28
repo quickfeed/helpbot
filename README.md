@@ -5,10 +5,16 @@
   - [All available commands](#all-available-commands)
   - [Work in progress](#work-in-progress)
   - [Setup](#setup)
-    - [Creating a discord application and bot user](#creating-a-discord-application-and-bot-user)
     - [Discord server setup](#discord-server-setup)
+      - [Bot Permissions](#bot-permissions)
+    - [Creating a discord application and bot user](#creating-a-discord-application-and-bot-user)
+    - [Inviting the bot to your server](#inviting-the-bot-to-your-server)
     - [Obtaining Discord IDs](#obtaining-discord-ids)
+    - [Obtaining a GitHub access token](#obtaining-a-github-access-token)
     - [Configuring the bot](#configuring-the-bot)
+      - [Automatic registration](#automatic-registration)
+      - [Autograder support](#autograder-support)
+      - [Global configuration](#global-configuration)
 
 A discord bot to help teaching assistants keep track of students who need help.
 
@@ -65,18 +71,32 @@ Teaching assistant role:
 
 ## Setup
 
-### Creating a discord application and bot user
-
-Go to the [Discord Developer Portal](https://discord.com/developers) and create a new application.
-Next, click on the "bot" page and add a bot user.
-Here you can set the bot username and icon.
-You will also find the *bot token*, which is needed to start the bot.
-
 ### Discord server setup
 
 Your discord server needs to provide two different roles: one for students, and one for teaching assistants.
 You should also ensure that the bot has read access to all of the text channels that it needs to be able to monitor.
 The bot can, however, operate entirily through direct messages (DMs), and this is the intended way for the bot to be used.
+
+#### Bot Permissions
+
+The bot needs to have the `Manage Nicknames` and `Manage Roles` permissions in order to support automatic registration.
+
+### Creating a discord application and bot user
+
+Go to the [Discord Developer Portal](https://discord.com/developers) and create a new application.
+![Discord Developer Portal](.github/new_application.png)
+Next, click on the "bot" page and add a bot user.
+![Discord Bot Setup](.github/add-a-bot-png.png)
+Here you can set the bot username and icon.
+You will also find the *bot token*, which is needed to start the bot.
+![Discord Bot Token](.github/bot-token.png)
+
+### Inviting the bot to your server
+
+To invite your bot to your server, go to the *Oauth2* page and check the *bot* scope.
+Then, enable the permissions as needed. Finally, copy the generated url and open the url in your browser.
+You will then be able to add the bot to your server.
+![Discord Bot Oauth2](.github/oauth_scopes.png)
 
 ### Obtaining Discord IDs
 
@@ -86,6 +106,14 @@ The bot uses Discord IDs for configuration. You can find these by turning on dev
 You can then copy discord IDs by right clicking a role or a channel, for example:
 ![Copy Discord ID for a role](.github/copy_id.png)
 
+### Obtaining a GitHub access token
+
+A github access token is needed for the bot to verify github organization memberships.
+To create a token, go to <https://github.com/settings/tokens> and click *"Generate new token"*.
+Then, under scopes, select the `read:org` scope. Then click *generate* on the bottom of the page.
+Remember to copy the access token that is generated.
+![GitHub oauth scopes](.github/gh_oauth_scopes.png)
+
 ### Configuring the bot
 
 A config file must be named `.helpbotrc`. The default syntax is TOML.
@@ -93,26 +121,44 @@ You may specify a different file extension, for example ".yml" or ".json" if you
 
 Discord IDs are obtained as explained above.
 
-The following configuration variables are available
+The following configuration variables must be set:
 
 ```toml
+[[instances]]
 db-path = "<path to sqlite database file>" # if empty, an in-memory database will be used
 token = "<discord bot token>"              # the token that you got from the Discord Developer Portal
 prefix = "!"                               # the prefix used before each command, for example !help
 guild = <discord id>                       # the id of the server
 student-role = <discord id>                # the id of the student role
 assistant-role = <discord id>              # the id of the teaching assistant role
-help-channel = <discord id>                # the id of the text channel where students can ask for help (can be ignored; may be removed in the future)
-lobby-channel = <discord id>               # the id of the voice channel where students can wait for help (may be removed in the future)
-gh-token = "<github access token>"         # github access token with `read:org` access to the relevant github organization
-gh-org = "<github org name>"               # the name of the course's github organization
 ```
+
+#### Automatic registration
+
+The following configuration variables are needed to allow students to register by providing a github username associated with the course's github organization:
+
+```toml
+gh-token = "<github access token>" # github access token with `read:org` access to the relevant github organization
+gh-org = "<github org name>"       # the name of the course's github organization
+```
+
+#### Autograder support
 
 The follwing configuration variables are available to enable autograder support:
 
 ```toml
-autograder = true             # enable autograder support
-autograder-user-id = 1        # the user id to use with autograder
+autograder = true             # enable autograder support for this instance
 course-code = "<course code>" # the course code to use with autograder
 course-year = 2020            # the year of the course
+```
+
+You can create multiple bot instances by adding several configurations, each beginning with `[[instances]]`.
+
+#### Global configuration
+
+The following configurations apply to all instances
+
+```toml
+autograder = true             # enable autograder support
+autograder-user-id = 1        # the user id to use with autograder
 ```
