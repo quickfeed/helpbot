@@ -66,8 +66,6 @@ Teaching assistant role:
     If enabled, the bot will also get the student's real name from autograder.
   - In the future, this should be properly authenticated using Oauth either using the GitHub API, or by using Discord connections.
   - When the bot has confirmed that the user has access to GitHub/autograder, the bot will automatically assign a nickname and roles.
-- Joining multiple servers
-  - Currently, you must run a new instance of the bot for each server.
 
 ## Setup
 
