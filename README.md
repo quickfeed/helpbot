@@ -104,6 +104,11 @@ The bot uses Discord IDs for configuration. You can find these by turning on dev
 You can then copy discord IDs by right clicking a role or a channel, for example:
 ![Copy Discord ID for a role](.github/copy_id.png)
 
+You will need to copy the following IDs:
+
+- The ID of the server itself - Right click the server name in the top-left corner of the discord window.
+- The ID of both the student and teaching assistant roles - Right click the name of the role in the server settings.
+
 ### Obtaining a GitHub access token
 
 A github access token is needed for the bot to verify github organization memberships.
