@@ -75,7 +75,7 @@ Teaching assistant role:
 
 Your discord server needs to provide two different roles: one for students, and one for teaching assistants.
 You should also ensure that the bot has read access to all of the text channels that it needs to be able to monitor.
-The bot can, however, operate entirily through direct messages (DMs), and this is the intended way for the bot to be used.
+The bot can, however, operate entirely through direct messages (DMs), and this is the intended way for the bot to be used.
 
 #### Bot Permissions
 
