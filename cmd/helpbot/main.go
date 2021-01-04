@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,7 +14,6 @@ import (
 
 const (
 	botName = "helpbot"
-	cfgFile = ".helpbotrc"
 )
 
 var log = &logrus.Logger{
@@ -23,10 +23,16 @@ var log = &logrus.Logger{
 	Level:     logrus.InfoLevel,
 }
 
-var ag *helpbot.Autograder
+var (
+	ag      *helpbot.Autograder
+	cfgFile string
+)
 
 func main() {
-	err := initConfig()
+	flag.StringVar(&cfgFile, "config", ".helpbotrc", "Path to configuration file")
+	flag.Parse()
+
+	err := initConfig(cfgFile)
 	if err != nil {
 		log.Fatalln("Failed to read config:", err)
 	}

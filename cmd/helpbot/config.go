@@ -7,7 +7,7 @@ import (
 
 var cfg []helpbot.Config
 
-func initConfig() (err error) {
+func initConfig(cfgFile string) (err error) {
 	// command line
 
 	// env
