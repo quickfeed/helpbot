@@ -5,3 +5,4 @@ services:
     volumes: 
       - .:/code
     working_dir: /code
+    command: ["-config=.helpbotrc"]
