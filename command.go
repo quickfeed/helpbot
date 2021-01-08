@@ -64,7 +64,6 @@ var studentHelp = createTemplate("studentHelp", `Available commands:
 `+"```"+`
 After requesting help, you can check the response message you got to see your position in the queue.
 You will receive a message when you are next in queue.
-Before you can be contacted by a teaching assistant, you must connect to the {{ch .LobbyChannel}} channel.
 `+privacy)
 
 var assistant = createTemplate("assistantHelp", `Teaching Assistant commands:

@@ -16,7 +16,6 @@ type Config struct {
 	GHToken       string            `mapstructure:"gh-token"`
 	Prefix        string            `mapstructure:"prefix"`
 	Guild         disgord.Snowflake `mapstructure:"guild"`
-	LobbyChannel  disgord.Snowflake `mapstructure:"lobby-channel"`
 	StudentRole   disgord.Snowflake `mapstructure:"student-role"`
 	AssistantRole disgord.Snowflake `mapstructure:"assistant-role"`
 	GitHubOrg     string            `mapstructure:"gh-org"`
