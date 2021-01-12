@@ -20,6 +20,10 @@ A discord bot to help teaching assistants keep track of students who need help.
 
 This bot manages a queue of students who request help from teaching assistants.
 
+## UiS Courses
+
+We are hosting bot instances for courses on the UiS autograder (<https://uis.itest.run/app/home>). Please contact john.i.olsen@uis.no if you want to use this bot for your course.
+
 ## Current features
 
 - Students can request help using "!gethelp" or request approval of an assignment using "!approve"
@@ -148,6 +152,7 @@ gh-org = "<github org name>"       # the name of the course's github organizatio
 #### Autograder support
 
 The follwing configuration variables are available to enable autograder support:
+Currently, we have to run the bot on the same *physical* server as autograder for this to work.
 
 ```toml
 autograder = true             # enable autograder support for this instance
