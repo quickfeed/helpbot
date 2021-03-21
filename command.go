@@ -75,11 +75,7 @@ var assistant = createTemplate("assistantHelp", `Teaching Assistant commands:
 {{.Prefix}}next:               Removes and returns the first student from the queue.
 {{.Prefix}}clear:              Clears the queue!
 {{.Prefix}}unregister @mention Unregisters the mentioned user.
-<<<<<<< HEAD
 {{.Prefix}}whois @mention      Returns the real name of the mentioned user.
-=======
-{{.Prefix}}whois @mention		Returns the real name of the mentioned user
->>>>>>> parent of 7460eed... fix help alignment
 {{.Prefix}}cancel              Cancels your 'waiting' status.
 `+"```"+privacy)
 
