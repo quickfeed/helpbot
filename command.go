@@ -69,14 +69,14 @@ You will receive a message when you are next in queue.
 
 var assistant = createTemplate("assistantHelp", `Teaching Assistant commands:
 `+"```"+`
-{{.Prefix}}help:               	Shows this help text
-{{.Prefix}}length:             	Returns the number of students waiting for help.
-{{.Prefix}}list <num>:         	Lists the next <num> students in the queue.
-{{.Prefix}}next:               	Removes and returns the first student from the queue.
-{{.Prefix}}clear:              	Clears the queue!
-{{.Prefix}}unregister @mention 	Unregisters the mentioned user.
-{{.Prefix}}whois @mention      	Returns the real name of the mentioned user.
-{{.Prefix}}cancel              	Cancels your 'waiting' status.
+{{.Prefix}}help:               Shows this help text
+{{.Prefix}}length:             Returns the number of students waiting for help.
+{{.Prefix}}list <num>:         Lists the next <num> students in the queue.
+{{.Prefix}}next:               Removes and returns the first student from the queue.
+{{.Prefix}}clear:              Clears the queue!
+{{.Prefix}}unregister @mention Unregisters the mentioned user.
+{{.Prefix}}whois @mention      Returns the real name of the mentioned user.
+{{.Prefix}}cancel              Cancels your 'waiting' status.
 `+"```"+privacy)
 
 func (bot *HelpBot) helpCommand(m *disgord.MessageCreate, helpTmpl *template.Template) error {
