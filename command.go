@@ -545,13 +545,14 @@ func (bot *HelpBot) whoIsCommand(m *disgord.MessageCreate) {
 	user := m.Message.Mentions[0]
 	var student Student
 	if !bot.cfg.Autograder {
-		replyMsg(bot.client, m, "An uknown error occurred")
+		replyMsg(bot.client, m, "This bot is not linked with Autograder.")
 		return
 	}
 	err := bot.db.Where("user_id = ?", user.ID).First(&student).Error
 	if err != nil {
 		bot.log.Errorln("Failed to retrieve real name from db:", err)
 		replyMsg(bot.client, m, "An uknown error occurred")
+		return
 	}
 
 	replyMsg(bot.client, m, fmt.Sprintf(
