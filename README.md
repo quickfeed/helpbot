@@ -83,6 +83,10 @@ The bot can, however, operate entirely through direct messages (DMs), and this i
 
 The bot needs to have the `Manage Nicknames` and `Manage Roles` permissions in order to support automatic registration.
 
+**Note**: If your bot has a specific role in your server, you need to ensure that the bot role is above the students role, otherwise, the bot
+will not be able to manage roles and nicknames of students, and you will get permission errors.
+You can read more about the [Role Hierarchies](https://support.discord.com/hc/en-us/articles/214836687-Role-Management-101) in the discord documentation.
+
 ### Creating a discord application and bot user
 
 Go to the [Discord Developer Portal](https://discord.com/developers) and create a new application.
