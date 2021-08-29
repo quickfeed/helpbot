@@ -172,5 +172,11 @@ The following configurations apply to all instances
 
 ```toml
 autograder = true             # enable autograder support
-autograder-user-id = 1        # the user id to use with autograder
+```
+
+The following environment variable should be set before running the helpbot.
+This variable must the same as the token used by the QuickFeed server.
+
+```env
+QUICKFEED_AUTH_TOKEN = "<quickfeed auth token>" # quickfeed auth token
 ```
