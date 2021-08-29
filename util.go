@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/andersfylling/disgord"
-	"github.com/prometheus/common/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // replyMsg sends a direct message response to the author of the message.
