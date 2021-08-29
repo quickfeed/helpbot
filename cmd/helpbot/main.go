@@ -60,7 +60,8 @@ func main() {
 		}
 		err = bot.Connect(ctx)
 		if err != nil {
-			log.Fatalf("Failed to connect: %v", err)
+			log.Errorf("Failed to connect: %v", err)
+			continue
 		}
 		bots = append(bots, bot)
 	}
