@@ -40,6 +40,9 @@ type HelpBot struct {
 
 func (bot *HelpBot) Connect(ctx context.Context) error {
 	bot.gh = initGithub(ctx, bot.cfg.GHToken)
+	if bot.client == nil {
+		return fmt.Errorf("disgord client not initialized for course: %s", bot.cfg.CourseCode)
+	}
 	return bot.client.Connect(ctx)
 }
 

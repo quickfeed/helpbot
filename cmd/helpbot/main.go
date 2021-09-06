@@ -38,7 +38,11 @@ func main() {
 	}
 
 	if viper.GetBool("autograder") {
-		ag, err = helpbot.NewAutograder(viper.GetInt("autograder-user-id"))
+		authToken := os.Getenv("QUICKFEED_AUTH_TOKEN")
+		if authToken == "" {
+			log.Fatalln("QUICKFEED_AUTH_TOKEN is not set")
+		}
+		ag, err = helpbot.NewAutograder(authToken)
 		if err != nil {
 			log.Fatalln("Failed to init autograder:", err)
 		}
@@ -56,7 +60,8 @@ func main() {
 		}
 		err = bot.Connect(ctx)
 		if err != nil {
-			log.Fatalf("Failed to connect: %v", err)
+			log.Errorf("Failed to connect: %v", err)
+			continue
 		}
 		bots = append(bots, bot)
 	}

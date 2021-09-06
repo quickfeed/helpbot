@@ -2,7 +2,6 @@ package helpbot
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	agpb "github.com/autograde/quickfeed/ag"
@@ -20,7 +19,7 @@ func (s *Autograder) Close() {
 	s.cc.Close()
 }
 
-func NewAutograder(userID int) (*Autograder, error) {
+func NewAutograder(authToken string) (*Autograder, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	cc, err := grpc.DialContext(ctx, ":9090", grpc.WithInsecure(), grpc.WithBlock())
@@ -31,6 +30,6 @@ func NewAutograder(userID int) (*Autograder, error) {
 	return &Autograder{
 		cc:                      cc,
 		AutograderServiceClient: ag,
-		md:                      metadata.New(map[string]string{"user": fmt.Sprintf("%d", userID)}),
+		md:                      metadata.New(map[string]string{"cookie": authToken}),
 	}, nil
 }
