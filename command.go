@@ -39,6 +39,7 @@ func (bot *HelpBot) initCommands() {
 		"next":       bot.nextRequestCommand,
 		"clear":      bot.clearCommand,
 		"unregister": bot.unregisterCommand,
+		"whois":      bot.whoIsCommand,
 		"cancel":     bot.assistantCancelCommand,
 	}
 }
@@ -74,6 +75,7 @@ var assistant = createTemplate("assistantHelp", `Teaching Assistant commands:
 {{.Prefix}}next:               Removes and returns the first student from the queue.
 {{.Prefix}}clear:              Clears the queue!
 {{.Prefix}}unregister @mention Unregisters the mentioned user.
+{{.Prefix}}whois @mention      Returns the real name of the mentioned user.
 {{.Prefix}}cancel              Cancels your 'waiting' status.
 `+"```"+privacy)
 
@@ -533,6 +535,30 @@ func (bot *HelpBot) registerCommand(m *disgord.MessageCreate) {
 	replyMsg(bot.client, m, fmt.Sprintf(
 		"Authentication was successful! You should now have more access to the server. Type %shelp to see available commands",
 		bot.cfg.Prefix))
+}
+
+func (bot *HelpBot) whoIsCommand(m *disgord.MessageCreate) {
+	if len(m.Message.Mentions) < 1 {
+		replyMsg(bot.client, m, "You must `@mention` a user to get the real name of.")
+		return
+	}
+	user := m.Message.Mentions[0]
+	var student Student
+	if !bot.cfg.Autograder {
+		replyMsg(bot.client, m, "This bot is not linked with Autograder.")
+		return
+	}
+	err := bot.db.Where("user_id = ?", user.ID).First(&student).Error
+	if err != nil {
+		bot.log.Errorln("Failed to retrieve real name from db:", err)
+		replyMsg(bot.client, m, "An uknown error occurred")
+		return
+	}
+
+	replyMsg(bot.client, m, fmt.Sprintf(
+		"@%s is %s",
+		user.Username, student.Name))
+
 }
 
 func (bot *HelpBot) unregisterCommand(m *disgord.MessageCreate) {
