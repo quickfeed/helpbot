@@ -1,35 +1,31 @@
 package helpbot
 
 import (
-	"context"
-	"time"
+	"crypto/tls"
+	"net/http"
 
-	agpb "github.com/autograde/quickfeed/ag"
-	"google.golang.org/grpc"
+	"github.com/bufbuild/connect-go"
+	"github.com/quickfeed/quickfeed/qf/qfconnect"
+	"github.com/quickfeed/quickfeed/web/interceptor"
 	"google.golang.org/grpc/metadata"
 )
 
-type Autograder struct {
-	cc *grpc.ClientConn
-	agpb.AutograderServiceClient
+type QuickFeed struct {
+	qf qfconnect.QuickFeedServiceClient
 	md metadata.MD
 }
 
-func (s *Autograder) Close() {
-	s.cc.Close()
-}
-
-func NewAutograder(authToken string) (*Autograder, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	cc, err := grpc.DialContext(ctx, ":9090", grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		return nil, err
+func NewAutograder(authToken string) (*QuickFeed, error) {
+	client := http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
 	}
-	ag := agpb.NewAutograderServiceClient(cc)
-	return &Autograder{
-		cc:                      cc,
-		AutograderServiceClient: ag,
-		md:                      metadata.New(map[string]string{"cookie": authToken}),
+	qf := qfconnect.NewQuickFeedServiceClient(&client, "https://127.0.0.1", connect.WithInterceptors(
+		interceptor.NewTokenAuthClientInterceptor(authToken),
+	))
+	return &QuickFeed{
+		qf: qf,
+		md: metadata.New(map[string]string{"Authorization": authToken}),
 	}, nil
 }

@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/andersfylling/disgord"
 	"github.com/jinzhu/gorm"
 )
 
@@ -25,30 +24,30 @@ func TestMain(m *testing.M) {
 }
 
 func TestCreateAndRetrieveHelpRequests(t *testing.T) {
-	db.Create(&HelpRequest{StudentUserID: 1, Student: Student{}, Done: true})
+	db.Create(&HelpRequest{StudentUserID: "1", Student: Student{}, Done: true})
 	var req HelpRequest
 	db.Find(&req, "student_user_id = ?", 1)
-	if req.StudentUserID != 1 {
+	if req.StudentUserID != "1" {
 		t.Fatalf("Failed to create and retrieve users")
 	}
 }
 
 func TestGetPosInQueue(t *testing.T) {
-	db.Create(&HelpRequest{StudentUserID: 1, Student: Student{}})
-	db.Create(&HelpRequest{StudentUserID: 2, Student: Student{}})
-	db.Create(&HelpRequest{StudentUserID: 3, Student: Student{}, Done: true})
-	db.Create(&HelpRequest{StudentUserID: 4, Student: Student{}})
+	db.Create(&HelpRequest{StudentUserID: "1", Student: Student{}})
+	db.Create(&HelpRequest{StudentUserID: "2", Student: Student{}})
+	db.Create(&HelpRequest{StudentUserID: "3", Student: Student{}, Done: true})
+	db.Create(&HelpRequest{StudentUserID: "4", Student: Student{}})
 
-	check := func(name disgord.Snowflake, want int) {
+	check := func(name string, want int) {
 		if pos, err := getPosInQueue(db, name); err != nil {
-			t.Errorf("getPosInQueue(%d): %v", name, err)
+			t.Errorf("getPosInQueue(%s): %v", name, err)
 		} else if pos != want {
-			t.Errorf("getPosInQueue(%d): got %d, want %d", name, pos, want)
+			t.Errorf("getPosInQueue(%s): got %d, want %d", name, pos, want)
 		}
 	}
 
-	check(1, 1)
-	check(2, 2)
-	check(3, 0)
-	check(4, 3)
+	check("1", 1)
+	check("2", 2)
+	check("3", 0)
+	check("4", 3)
 }

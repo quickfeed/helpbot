@@ -3,7 +3,6 @@ package helpbot
 import (
 	"time"
 
-	"github.com/andersfylling/disgord"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite" // for sqlite support
 )
@@ -16,9 +15,9 @@ func OpenDatabase(path string) (db *gorm.DB, err error) {
 
 type HelpRequest struct {
 	gorm.Model
-	StudentUserID   disgord.Snowflake `gorm:"index"`
+	StudentUserID   string `gorm:"index"`
 	Student         Student
-	AssistantUserID disgord.Snowflake
+	AssistantUserID string
 	Assistant       Assistant
 	Type            string `gorm:"index"`
 	Done            bool
@@ -27,13 +26,13 @@ type HelpRequest struct {
 }
 
 type Assistant struct {
-	UserID      disgord.Snowflake `gorm:"primary_key"`
+	UserID      string `gorm:"primary_key"`
 	Waiting     bool
 	LastRequest time.Time
 }
 
 type Student struct {
-	UserID      disgord.Snowflake `gorm:"primary_key"`
+	UserID      string `gorm:"primary_key"`
 	GithubLogin string
 	Name        string
 	StudentID   string
