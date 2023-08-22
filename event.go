@@ -165,19 +165,29 @@ func (bot *HelpBot) discordServerJoin(s *discordgo.Session, e *discordgo.GuildCr
 	bot.roles[e.ID] = roleMap
 }
 
-func (bot *HelpBot) discordMessageCreate(s *discordgo.Session, m *discordgo.InteractionCreate) {
-
-	for _, content := range m.ApplicationCommandData().Options {
-		fmt.Println("content", content)
+func (bot *HelpBot) createChannel(s *discordgo.Session, guildID, name string, roles ...string) error {
+	channel, err := s.GuildChannelCreateComplex(guildID, discordgo.GuildChannelCreateData{
+		Name: "test",
+		Type: discordgo.ChannelTypeGuildText,
+		PermissionOverwrites: []*discordgo.PermissionOverwrite{
+			{
+				ID:   bot.GetRole(guildID, RoleStudent),
+				Type: discordgo.PermissionOverwriteTypeRole,
+			},
+			{
+				ID:   guildID, // Everyone
+				Type: discordgo.PermissionOverwriteTypeRole,
+				Deny: discordgo.PermissionViewChannel,
+			},
+		},
+	})
+	if err != nil {
+		bot.log.Errorln("Failed to create channel:", err)
+		return err
 	}
-
-	command := m.ApplicationCommandData().Name
-
-	gm := getMember(s, m)
-	if gm == nil {
-		bot.log.Infoln("messageCreate: Failed to get guild member:")
-		return
-	}
+	bot.log.Infof("Created channel: %s", channel.Name)
+	return nil
+}
 
 func courseChoices(db *database.Database) (choices []*discordgo.ApplicationCommandOptionChoice) {
 	courses, err := db.GetCourses()
