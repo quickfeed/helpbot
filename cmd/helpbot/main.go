@@ -36,8 +36,7 @@ func main() {
 	}
 
 	if viper.GetBool("quickfeed") {
-		authToken := os.Getenv("QUICKFEED_AUTH_TOKEN")
-		
+		authToken := viper.GetString("auth-token")
 		if authToken == "" {
 			log.Fatalln("QUICKFEED_AUTH_TOKEN is not set")
 		}
