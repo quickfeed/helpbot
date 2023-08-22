@@ -57,13 +57,12 @@ func (bot *HelpBot) Disconnect() error {
 	return bot.client.Close()
 }
 
-func GetCommands(courses []*qfpb.Course) []*discordgo.ApplicationCommand {
-	var courseChoices []*discordgo.ApplicationCommandOptionChoice
-	for _, course := range courses {
-		courseChoices = append(courseChoices, &discordgo.ApplicationCommandOptionChoice{
+func GetCommands(course *models.Course) []*discordgo.ApplicationCommand {
+	courseChoices := []*discordgo.ApplicationCommandOptionChoice{
+		{
 			Name:  course.Name,
-			Value: course.Code,
-		})
+			Value: course.Name,
+		},
 	}
 
 	return []*discordgo.ApplicationCommand{
@@ -92,8 +91,9 @@ func GetCommands(courses []*qfpb.Course) []*discordgo.ApplicationCommand {
 			Description: "Get a list of all commands.",
 		},
 		{
-			Name:        "unregister",
-			Description: "Unregister from a course.",
+			Name:                     "unregister",
+			Description:              "Unregister from a course.",
+			DefaultMemberPermissions: &permStudent,
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Name:        "course",
@@ -105,24 +105,29 @@ func GetCommands(courses []*qfpb.Course) []*discordgo.ApplicationCommand {
 			},
 		},
 		{
-			Name:        "gethelp",
-			Description: "Get help from a teaching assistant.",
+			Name:                     "gethelp",
+			DefaultMemberPermissions: &permStudent,
+			Description:              "Get help from a teaching assistant.",
 		},
 		{
-			Name:        "approve",
-			Description: "Get your lab approved by a teaching assistant.",
+			Name:                     "approve",
+			DefaultMemberPermissions: &permStudent,
+			Description:              "Get your lab approved by a teaching assistant.",
 		},
 		{
-			Name:        "cancel",
-			Description: "Cancels a pending request for help and removes you from the queue.",
+			Name:                     "cancel",
+			DefaultMemberPermissions: &permStudent,
+			Description:              "Cancels a pending request for help and removes you from the queue.",
 		},
 		{
-			Name:        "status",
-			Description: "Get the status of your help request.",
+			Name:                     "status",
+			DefaultMemberPermissions: &permStudent,
+			Description:              "Get the status of your help request.",
 		},
 		{
-			Name:        "list",
-			Description: "List <number> of students in the queue. If no number is given, all students in the queue are listed. ",
+			Name:                     "list",
+			DefaultMemberPermissions: &permAssistant,
+			Description:              "List <number> of students in the queue. If no number is given, all students in the queue are listed. ",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Name:        "number",
@@ -132,12 +137,56 @@ func GetCommands(courses []*qfpb.Course) []*discordgo.ApplicationCommand {
 				},
 			},
 		},
+		{
+			Name:                     "next",
+			DefaultMemberPermissions: &permAssistant,
+			Description:              "Get the next student in the queue.",
+		},
+		{
+			Name:                     "config",
+			DefaultMemberPermissions: &permAdmin,
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Name:        "course",
+					Type:        discordgo.ApplicationCommandOptionString,
+					Description: "the course you want to configure.",
+					Required:    true,
+					Choices:     courseChoices,
+				},
+			},
+		},
 	}
 }
 
 var (
 	// No permissions
 	NoPermission int64 = 0
+	// https://discord.com/developers/docs/topics/permissions
+	basePermissions int64 = discordgo.PermissionViewChannel |
+		discordgo.PermissionSendMessages |
+		discordgo.PermissionEmbedLinks |
+		discordgo.PermissionAttachFiles |
+		discordgo.PermissionAddReactions |
+		discordgo.PermissionUseExternalEmojis |
+		discordgo.PermissionReadMessageHistory |
+		discordgo.PermissionUseSlashCommands |
+		discordgo.PermissionVoiceConnect |
+		discordgo.PermissionVoiceSpeak |
+		discordgo.PermissionVoiceStreamVideo |
+		discordgo.PermissionCreatePublicThreads |
+		discordgo.PermissionSendMessagesInThreads
+	// Student permissions
+	permStudent int64 = basePermissions
+	// Teaching assistant permissions
+	permAssistant int64 = basePermissions |
+		discordgo.PermissionManageNicknames |
+		discordgo.PermissionManageRoles |
+		discordgo.PermissionManageMessages |
+		discordgo.PermissionKickMembers |
+		discordgo.PermissionMentionEveryone |
+		discordgo.PermissionVoiceMoveMembers |
+		discordgo.PermissionManageThreads
+	permAdmin int64 = discordgo.PermissionAdministrator
 )
 
 func New(cfg Config, log *logrus.Logger, qf *QuickFeed) (bot *HelpBot, err error) {
