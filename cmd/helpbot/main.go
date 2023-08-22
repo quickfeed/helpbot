@@ -25,11 +25,11 @@ var log = &logrus.Logger{
 }
 
 var (
-	ag      *helpbot.QuickFeed
-	cfgFile string
+	ag *helpbot.QuickFeed
 )
 
 func main() {
+	var cfgFile string
 	flag.StringVar(&cfgFile, "config", ".helpbotrc", "Path to configuration file")
 	flag.Parse()
 
@@ -82,4 +82,26 @@ func main() {
 		}
 		cancel()
 	}
+}
+
+var cfg []helpbot.Config
+
+func initConfig(cfgFile string) (err error) {
+	// command line
+
+	// env
+	viper.SetEnvPrefix(botName)
+	viper.AutomaticEnv()
+
+	// config file
+	viper.SetConfigName(cfgFile)
+	viper.SetConfigType("toml")
+	viper.AddConfigPath(".")
+	err = viper.ReadInConfig()
+	if err != nil {
+		return
+	}
+
+	err = viper.UnmarshalKey("instances", &cfg)
+	return
 }
