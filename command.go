@@ -20,25 +20,25 @@ type command func(m *discordgo.InteractionCreate)
 type commandMap map[string]command
 
 func (bot *HelpBot) initCommands() {
-	bot.baseCommands = commandMap{
-		"help":     bot.baseHelpCommand,
-		"register": bot.registerCommand,
-	}
-	bot.studentCommands = commandMap{
-		"help":    bot.studentHelpCommand,
-		"gethelp": func(m *discordgo.InteractionCreate) { bot.helpRequestCommand(m, "help") },
-		"approve": func(m *discordgo.InteractionCreate) { bot.helpRequestCommand(m, "approve") },
-		"cancel":  bot.cancelRequestCommand,
-		"status":  bot.studentStatusCommand,
-	}
-	bot.assistantCommands = commandMap{
-		"help":       bot.assistantHelpCommand,
-		"length":     bot.lengthCommand,
-		"list":       bot.listCommand,
-		"next":       bot.nextRequestCommand,
-		"clear":      bot.clearCommand,
-		"unregister": bot.unregisterCommand,
-		"cancel":     bot.assistantCancelCommand,
+	bot.commands = commandMap{
+		// base commands
+		"help":      bot.helpCommand,
+		"register":  bot.registerCommand,
+		"configure": bot.configureCommand,
+
+		// student commands
+		"gethelp": bot.hasRole(func(m *discordgo.InteractionCreate) { bot.helpRequestCommand(m, "help") }, RoleStudent),
+		"approve": bot.hasRole(func(m *discordgo.InteractionCreate) { bot.helpRequestCommand(m, "approve") }, RoleStudent),
+		"cancel":  bot.hasRole(bot.cancelRequestCommand, RoleStudent),
+		"status":  bot.hasRole(bot.studentStatusCommand, RoleStudent),
+
+		// assistant commands
+		"length":         bot.hasRole(bot.lengthCommand, RoleAssistant),
+		"list":           bot.hasRole(bot.listCommand, RoleAssistant),
+		"next":           bot.hasRole(bot.nextRequestCommand, RoleAssistant),
+		"clear":          bot.hasRole(bot.clearCommand, RoleAssistant),
+		"unregister":     bot.hasRole(bot.unregisterCommand, RoleAssistant),
+		"cancel-waiting": bot.hasRole(bot.assistantCancelCommand, RoleAssistant),
 	}
 }
 
@@ -572,6 +572,19 @@ func (bot *HelpBot) assistantCancelCommand(m *discordgo.InteractionCreate) {
 		replyMsg(bot.client, m, "An unknown error occurred")
 		return
 	}
+
+// hasRole returns a function that checks if the user has the specified role, and then calls the original function.
+// If the user does not have the role, a message is sent to the user saying that they do not have permission to use the command.
+// This function is used to wrap the command functions to check if the user has the required role.
+func (bot *HelpBot) hasRole(f func(*discordgo.InteractionCreate), roles ...string) func(*discordgo.InteractionCreate) {
+	return func(m *discordgo.InteractionCreate) {
+		if !bot.hasRoles(m.GuildID, m.Member, roles...) {
+			replyMsg(bot.client, m, "You do not have permission to use this command.")
+			return
+		}
+		f(m)
+	}
+}
 
 	if !assistant.Waiting {
 		replyMsg(bot.client, m, "You were not marked as waiting, so no action was taken.")

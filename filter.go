@@ -1,11 +1,13 @@
 package helpbot
 
-import "github.com/bwmarrin/discordgo"
+import (
+	"github.com/bwmarrin/discordgo"
+)
 
 // hasRoles filters out messages that don't contain any of the given roles.
-func (bot *HelpBot) hasRoles(gm *discordgo.Member, roles ...string) bool {
-
-	guildRoles, ok := bot.roles[gm.GuildID]
+func (bot *HelpBot) hasRoles(guildID string, gm *discordgo.Member, roles ...string) bool {
+	// TODO: Can be accessed concurrently, protect
+	guildRoles, ok := bot.roles[guildID]
 	if !ok {
 		return false
 	}
