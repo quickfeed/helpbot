@@ -231,6 +231,13 @@ func (bot *HelpBot) clearCommand(m *discordgo.InteractionCreate) {
 }
 
 func (bot *HelpBot) registerCommand(m *discordgo.InteractionCreate) {
+	// Check if course is configured
+	course, err := bot.db.GetCourse(&models.Course{GuildID: m.GuildID})
+	if err != nil {
+		bot.log.Errorln("Failed to get course:", err)
+		replyMsg(bot.client, m, "An unknown error occurred.")
+		return
+	}
 
 	// Check if role exists
 	studentRole := bot.GetRole(m.GuildID, RoleStudent)
@@ -264,20 +271,6 @@ func (bot *HelpBot) registerCommand(m *discordgo.InteractionCreate) {
 		return
 	}
 
-	membership, _, err := bot.gh.Organizations.GetOrgMembership(context.Background(), githubLogin, bot.cfg.GitHubOrg)
-	if err != nil {
-		bot.log.Infof("Failed to get org membership for user '%s': %v\n", githubLogin, err)
-		replyMsg(bot.client, m, "We were unable to verify that you are a member of the course's GitHub organization")
-		return
-	}
-
-	if membership.GetState() != "active" {
-		replyMsg(bot.client, m, fmt.Sprintf(
-			"Please make sure that you have accepted the invitation to join the '%s' organization on GitHub",
-			bot.cfg.GitHubOrg))
-		return
-	}
-
 	newStudent := models.Student{
 		UserID:      m.Member.User.ID,
 		GithubLogin: githubLogin,
@@ -287,12 +280,12 @@ func (bot *HelpBot) registerCommand(m *discordgo.InteractionCreate) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	req := &qfpb.EnrollmentRequest{
-		FetchMode: &qfpb.EnrollmentRequest_CourseID{CourseID: 1},
+		FetchMode: &qfpb.EnrollmentRequest_CourseID{CourseID: uint64(course.CourseID)},
 	}
 	enrollments, err := bot.qf.qf.GetEnrollments(ctx, connect.NewRequest(req))
 	if err != nil {
-		bot.log.Errorln("Failed to get info from autograder:", err)
-		replyMsg(bot.client, m, "Failed to communicate with autograder")
+		bot.log.Errorln("Failed to get info from QuickFeed:", err)
+		replyMsg(bot.client, m, "Failed to communicate with QuickFeed")
 		return
 	}
 
