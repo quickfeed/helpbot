@@ -40,10 +40,8 @@ type HelpBot struct {
 	// role mappings
 	roles map[string]map[string]string
 
-	// role to command mappings
-	baseCommands      commandMap
-	studentCommands   commandMap
-	assistantCommands commandMap
+	// command mappings. key is the command name, value is the function to call
+	commands commandMap
 }
 
 func (bot *HelpBot) Connect(ctx context.Context) error {
