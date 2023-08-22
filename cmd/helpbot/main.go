@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -31,7 +30,6 @@ func main() {
 	flag.StringVar(&cfgFile, "config", ".helpbotrc", "Path to configuration file")
 	flag.Parse()
 
-	fmt.Println("Starting", botName, "...")
 	err := initConfig(cfgFile)
 	if err != nil {
 		log.Fatalln("Failed to init config:", err)
@@ -39,7 +37,7 @@ func main() {
 
 	if viper.GetBool("quickfeed") {
 		authToken := os.Getenv("QUICKFEED_AUTH_TOKEN")
-		fmt.Println("QUICKFEED_AUTH_TOKEN:", authToken)
+		
 		if authToken == "" {
 			log.Fatalln("QUICKFEED_AUTH_TOKEN is not set")
 		}
@@ -67,7 +65,6 @@ func main() {
 		bots = append(bots, bot)
 	}
 
-	fmt.Println("Running", botName, "...")
 	// run until interrupted
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)

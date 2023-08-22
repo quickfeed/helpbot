@@ -20,7 +20,7 @@ func (bot *HelpBot) initEvents() {
 			sendMsg(s, i.User, "This bot only works in a server.")
 			return
 		}
-		fmt.Println("InteractionCreate", i.ApplicationCommandData().Name, user)
+		bot.log.Infof("Received interaction: %+v from user: %s", i, user.User.Username)
 		if i.Type != discordgo.InteractionApplicationCommand {
 			return
 		}
@@ -29,9 +29,6 @@ func (bot *HelpBot) initEvents() {
 		if i.Member.User.Bot {
 			return
 		}
-
-		// handler
-		bot.log.Infof("Received interaction: %+v", i)
 		bot.discordMessageCreate(s, i)
 	})
 

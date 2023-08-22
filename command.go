@@ -132,12 +132,8 @@ func (bot *HelpBot) cancelRequestCommand(m *discordgo.InteractionCreate) {
 
 func (bot *HelpBot) nextRequestCommand(m *discordgo.InteractionCreate) {
 	request, err := bot.db.AssignNextRequest(m.Member.User.ID, m.GuildID)
-	fmt.Println("request:", request)
 	if err != nil {
-		bot.log.Errorln("Failed to assign next request:", err)
-		fmt.Println("Failed to assign next request:", err)
-		fmt.Println("Sending message to user: ", m.Member.User.ID, " in guild: ", m.GuildID)
-
+		bot.log.Errorf("Failed to assign next request: %v by user: %s in guild: %s", err, m.Member.User.ID, m.GuildID)
 		replyMsg(bot.client, m, fmt.Sprintf("Failed to assign next request: %s", err))
 		return
 	}

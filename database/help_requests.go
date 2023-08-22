@@ -108,7 +108,6 @@ func (db *Database) AssignNextRequest(assistantID, guildID string) (*models.Help
 			db.log.Errorln("Failed to get assistant from DB:", err)
 			return err
 		}
-		fmt.Println("Picked up assistant: ", assistant)
 
 		var requests []*models.HelpRequest
 		// Get the oldest waiting request
@@ -117,24 +116,20 @@ func (db *Database) AssignNextRequest(assistantID, guildID string) (*models.Help
 			db.log.Errorln("Failed to get waiting requests from DB:", err)
 			return err
 		}
-		fmt.Println("Picked up requests: ", requests)
 
 		if err == gorm.ErrRecordNotFound {
 			assistant.Waiting = true
 			err := tx.Model(&models.Assistant{}).Save(&assistant).Error
 			if err != nil {
 				return fmt.Errorf("there are no more requests in the queue, but due to an error, you won't receive a notification when the next one arrives")
-
 			}
 		} else if err != nil {
 			return fmt.Errorf("an error occurred while fetching the next request")
 		}
-		fmt.Println("No errors so far...")
 
 		if len(requests) == 0 {
 			return fmt.Errorf("there are no more requests in the queue")
 		}
-		fmt.Println("Requests length is not 0...")
 
 		request := requests[0]
 		request.Assistant = *assistant
@@ -146,21 +141,16 @@ func (db *Database) AssignNextRequest(assistantID, guildID string) (*models.Help
 			"reason":            "assistantNext",
 		}).Error
 
-		fmt.Println("Updated request: ", request)
-
 		if err != nil {
 			db.log.Errorln("Failed to update help request:", err)
 			return fmt.Errorf("an error occurred while fetching the next request")
 		}
-
-		fmt.Println("No errors so far (after update)...")
 
 		if err := tx.Model(assistant).Update("last_request", time.Now()).Error; err != nil {
 			db.log.Errorln("Failed to update assistant:", err)
 			return err
 		}
 		req = request
-		fmt.Println("No errors so far (after save)...", req, err)
 		return nil
 	})
 	return req, err
