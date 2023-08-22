@@ -1,10 +1,14 @@
 package helpbot
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/Raytar/helpbot/database"
+	"github.com/Raytar/helpbot/models"
 	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 func (bot *HelpBot) initEvents() {
@@ -46,19 +50,54 @@ var (
 )
 
 func (bot *HelpBot) discordServerJoin(s *discordgo.Session, e *discordgo.GuildCreate) {
-	bot.log.Infof("Joined server: %s", e.Name, e.ID, e.SystemChannelID)
+	bot.log.Infof("Joined server: %s, id: %s, channel: %s", e.Name, e.ID, e.SystemChannelID)
 
-	bot.client.ChannelMessageSend(e.SystemChannelID, "HelpBot is online! :robot:")
-	// Check if the server name matches a course name
+	// Check if the server has been registered with a course
 	// If not, send a message to the server owner to let them know
-	// that the server name should match the course name
-	// and that the bot will not work until the server name is changed
-	// The bot should also be removed from the server
-	//for _, _ := range bot.courses {
-	//if e.Name == course.Name || e.Name == course.Code || e.Name == "jiuojuo" {
-	//	return
-	//}
-	//}
+	// that the server needs to be registered with a course
+	// and that the bot will not work until the server is registered
+
+	_, err := bot.db.GetCourse(&models.Course{GuildID: e.ID})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		bot.log.Errorf("Failed to get course: %s", err)
+		bot.client.ChannelMessageSend(e.SystemChannelID, "This server has not been configured with a course. Please contact the server owner to configure this server for a course.")
+
+		choices := courseChoices(bot.db)
+		if len(choices) == 0 {
+			bot.client.ChannelMessageSend(e.SystemChannelID, "There are no courses available to configure this server with. Please contact the server owner to add a course.")
+			return
+		}
+		// TODO: Add a command to configure the server with a course
+		if _, err := bot.client.ApplicationCommandCreate(bot.cfg.AppID, e.ID, &discordgo.ApplicationCommand{
+			Name:                     "configure",
+			Description:              "Configure this server with a course",
+			DefaultMemberPermissions: &permAdmin,
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "course",
+					Description: "The course to configure this server with",
+					Choices:     choices,
+					Required:    true,
+				},
+			},
+		}); err != nil {
+			bot.log.Errorf("Failed to create command: %s", err)
+		}
+		return
+	} else if err != nil {
+		bot.log.Errorf("Failed to get course: %s", err)
+		// TODO: Send a message to the server owner to let them know that the bot failed to get the course
+		return
+	}
+
+	// Create roles and commands for the server
+	_ = bot.initServer(s, e.ID)
+
+	// Announce that the bot is online and ready to help
+	// TODO: Might be best to send this to the server owner
+	// bot.client.ChannelMessageSend(e.SystemChannelID, "HelpBot is online! :robot:")
+}
 
 	// Send a message to the server owner
 	// to let them know that the server name should match the course name
