@@ -71,30 +71,19 @@ unregister @mention Unregisters the mentioned user.
 cancel              Cancels your 'waiting' status.
 `+"```", true)
 
-func (bot *HelpBot) helpCommand(m *discordgo.InteractionCreate, modal *discordgo.InteractionResponse) error {
-	replyModal(bot.client, m, modal)
-	return nil
-}
-
-func (bot *HelpBot) baseHelpCommand(m *discordgo.InteractionCreate) {
-	err := bot.helpCommand(m, baseHelp)
-	if err != nil {
-		bot.log.Error(err)
+func (bot *HelpBot) helpCommand(m *discordgo.InteractionCreate) {
+	// check if the user has the teaching assistant role
+	if bot.hasRoles(m.GuildID, m.Member, RoleAssistant) {
+		replyModal(bot.client, m, assistant)
+		return
 	}
-}
-
-func (bot *HelpBot) studentHelpCommand(m *discordgo.InteractionCreate) {
-	err := bot.helpCommand(m, studentHelp)
-	if err != nil {
-		bot.log.Error(err)
+	// check if the user has the student role
+	if bot.hasRoles(m.GuildID, m.Member, RoleStudent) {
+		replyModal(bot.client, m, studentHelp)
+		return
 	}
-}
-
-func (bot *HelpBot) assistantHelpCommand(m *discordgo.InteractionCreate) {
-	err := bot.helpCommand(m, assistant)
-	if err != nil {
-		bot.log.Error(err)
-	}
+	// user has no roles, show base help
+	replyModal(bot.client, m, baseHelp)
 }
 
 func (bot *HelpBot) helpRequestCommand(m *discordgo.InteractionCreate, requestType string) {
