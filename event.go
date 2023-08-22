@@ -179,36 +179,18 @@ func (bot *HelpBot) discordMessageCreate(s *discordgo.Session, m *discordgo.Inte
 		return
 	}
 
-	if bot.hasRoles(gm, RoleStudent) {
-		if cmdFunc, ok := bot.studentCommands[command]; ok {
-			cmdFunc(m)
-			return
-		}
-		goto reply
+func courseChoices(db *database.Database) (choices []*discordgo.ApplicationCommandOptionChoice) {
+	courses, err := db.GetCourses()
+	if err != nil {
+		log.Errorln("Failed to get courses:", err)
 	}
 
-	if bot.hasRoles(gm, RoleAssistant) {
-		if cmdFunc, ok := bot.assistantCommands[command]; ok {
-			cmdFunc(m)
-			return
-		}
-		goto reply
+	for _, course := range courses {
+		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
+			Name:  course.Name,
+			Value: course.Name,
+		})
 	}
 
-	if cmdFunc, ok := bot.baseCommands[command]; ok {
-		cmdFunc(m)
-		return
-	}
-
-reply:
-	replyMsg(bot.client, m, fmt.Sprintf("'%s' is not a recognized command. See %shelp for available commands.",
-		command, bot.cfg.Prefix))
-}
-
-func getMember(s *discordgo.Session, i *discordgo.InteractionCreate) *discordgo.Member {
-	if i.Member != nil {
-		return i.Member
-	}
-
-	return nil
+	return choices
 }
