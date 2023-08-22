@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Raytar/helpbot/database"
+	"github.com/Raytar/helpbot/models"
 	"github.com/bufbuild/connect-go"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/go-github/v32/github"
-	"github.com/jinzhu/gorm"
 	qfpb "github.com/quickfeed/quickfeed/qf"
 	"github.com/sirupsen/logrus"
 )
@@ -30,7 +31,7 @@ type Config struct {
 type HelpBot struct {
 	cfg     Config
 	client  *discordgo.Session
-	db      *gorm.DB
+	db      *database.Database
 	gh      *github.Client
 	qf      *QuickFeed
 	log     *logrus.Logger
@@ -196,13 +197,17 @@ func New(cfg Config, log *logrus.Logger, qf *QuickFeed) (bot *HelpBot, err error
 		return nil, err
 	}
 
-	if bot.db, err = OpenDatabase(cfg.DBPath); err != nil {
+	if bot.db, err = database.OpenDatabase(cfg.DBPath, log); err != nil {
 		return nil, err
 	}
 
 	if courses, err := bot.qf.qf.GetCourses(context.Background(), &connect.Request[qfpb.Void]{}); err != nil {
 		return nil, err
 	} else {
+		// Update the list of courses in the database
+		if err := bot.db.UpdateCourses(courses.Msg.GetCourses()); err != nil {
+			return nil, err
+		}
 		bot.courses = courses.Msg.GetCourses()
 	}
 
