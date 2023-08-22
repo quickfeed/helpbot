@@ -24,9 +24,7 @@ var log = &logrus.Logger{
 	Level:     logrus.InfoLevel,
 }
 
-var (
-	ag *helpbot.QuickFeed
-)
+var ag *helpbot.QuickFeed
 
 func main() {
 	var cfgFile string
@@ -45,7 +43,7 @@ func main() {
 		if authToken == "" {
 			log.Fatalln("QUICKFEED_AUTH_TOKEN is not set")
 		}
-		ag, err = helpbot.NewAutograder(authToken)
+		ag, err = helpbot.NewQuickFeed(authToken)
 		if err != nil {
 			log.Fatalln("Failed to init autograder:", err)
 		}

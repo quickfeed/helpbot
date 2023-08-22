@@ -15,7 +15,7 @@ type QuickFeed struct {
 	md metadata.MD
 }
 
-func NewAutograder(authToken string) (*QuickFeed, error) {
+func NewQuickFeed(authToken string) (*QuickFeed, error) {
 	client := http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
