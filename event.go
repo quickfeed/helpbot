@@ -99,16 +99,30 @@ func (bot *HelpBot) discordServerJoin(s *discordgo.Session, e *discordgo.GuildCr
 	// bot.client.ChannelMessageSend(e.SystemChannelID, "HelpBot is online! :robot:")
 }
 
-	// Send a message to the server owner
-	// to let them know that the server name should match the course name
-	//sendMsg(s, &discordgo.User{ID: e.OwnerID}, fmt.Sprintf("The server name '%s' does not match any courses. Please change the server name to match the course name and then add the bot back to the server.", e.Name))
+func (bot *HelpBot) discordMessageCreate(s *discordgo.Session, m *discordgo.InteractionCreate) {
+	command := m.ApplicationCommandData().Name
 
-	// Remove the bot from the server
-	//if err := s.GuildLeave(e.ID); err != nil {
-	//	bot.log.Errorf("Failed to leave server: %s", err)
-	//}
-	//bot.log.Infof("Left server: %s", e.Name)
-	//bot.log.Infof("The server name '%s' does not match any courses. Please change the server name to match the course name and then add the bot back to the server.", e.Name)
+	gm := getMember(s, m)
+	if gm == nil {
+		bot.log.Infoln("messageCreate: Failed to get guild member:")
+		return
+	}
+
+	if cmdFunc, ok := bot.commands[command]; ok {
+		cmdFunc(m)
+		return
+	}
+	replyMsg(bot.client, m, fmt.Sprintf("'%s' is not a recognized command. See %shelp for available commands.",
+		command, bot.cfg.Prefix))
+}
+
+func getMember(s *discordgo.Session, i *discordgo.InteractionCreate) *discordgo.Member {
+	if i.Member != nil {
+		return i.Member
+	}
+
+	return nil
+}
 
 // initServer creates the roles and commands for a server. Roles are created if they do not already exist.
 // Commands are created if they do not already exist. If a command already exists, it will be updated.
