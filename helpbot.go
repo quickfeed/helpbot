@@ -8,7 +8,6 @@ import (
 	"github.com/Raytar/helpbot/models"
 	"github.com/bufbuild/connect-go"
 	"github.com/bwmarrin/discordgo"
-	"github.com/google/go-github/v32/github"
 	qfpb "github.com/quickfeed/quickfeed/qf"
 	"github.com/sirupsen/logrus"
 )
@@ -32,7 +31,6 @@ type HelpBot struct {
 	cfg     Config
 	client  *discordgo.Session
 	db      *database.Database
-	gh      *github.Client
 	qf      *QuickFeed
 	log     *logrus.Logger
 	courses []*qfpb.Course
@@ -45,7 +43,6 @@ type HelpBot struct {
 }
 
 func (bot *HelpBot) Connect(ctx context.Context) error {
-	bot.gh = initGithub(ctx, bot.cfg.GHToken)
 	if bot.client == nil {
 		return fmt.Errorf("disgord client not initialized for course: %s", bot.cfg.CourseCode)
 	}
@@ -213,7 +210,6 @@ func New(cfg Config, log *logrus.Logger, qf *QuickFeed) (bot *HelpBot, err error
 		if err := s.UpdateGameStatus(0, "Type '/' in chat to see available commands"); err != nil {
 			log.Errorln("Failed to update status:", err)
 		}
-
 	})
 
 	bot.initCommands()

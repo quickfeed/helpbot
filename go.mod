@@ -3,12 +3,11 @@ module github.com/Raytar/helpbot
 go 1.19
 
 require (
-	github.com/google/go-github/v32 v32.1.0
 	github.com/quickfeed/quickfeed v0.0.0-20230720201745-75c1322654ce
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.16.0
-	golang.org/x/oauth2 v0.11.0
+	golang.org/x/oauth2 v0.11.0 // indirect
 	google.golang.org/grpc v1.57.0
 	gorm.io/gorm v1.25.4
 )
