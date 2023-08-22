@@ -110,24 +110,25 @@ func (bot *HelpBot) discordServerJoin(s *discordgo.Session, e *discordgo.GuildCr
 	//bot.log.Infof("Left server: %s", e.Name)
 	//bot.log.Infof("The server name '%s' does not match any courses. Please change the server name to match the course name and then add the bot back to the server.", e.Name)
 
-	commands := GetCommands(bot.courses)
+// initServer creates the roles and commands for a server. Roles are created if they do not already exist.
+// Commands are created if they do not already exist. If a command already exists, it will be updated.
+func (bot *HelpBot) initServer(s *discordgo.Session, guildID string) error {
+	course, err := bot.db.GetCourse(&models.Course{GuildID: guildID})
+	if err != nil {
+		return err
+	}
+	commands := GetCommands(course)
 	// Register slash commands. If a command already exists, it will be updated.
 	for _, cmd := range commands {
-		log.Info("Registering command: ", cmd.Name, " in server: ", e.Name, " with id: ", e.ID)
-		// Set permissions for all commands to NoPermission, except for the base commands.
-		// Base commands are commands that are available to everyone.
-		// All other commands need to be explicitly added to a role by the server admin.
-		if _, ok := bot.baseCommands[cmd.Name]; !ok {
-			cmd.DefaultMemberPermissions = &NoPermission
-		}
-		_, err := bot.client.ApplicationCommandCreate(bot.cfg.AppID, e.ID, cmd)
+		log.Info("Registering command: ", cmd.Name, " in server with id: ", guildID)
+		_, err := bot.client.ApplicationCommandCreate(bot.cfg.AppID, guildID, cmd)
 		if err != nil {
 			log.Errorln("Failed to create global command:", err)
 		}
 	}
 
 	// Get all roles in the server.
-	roles, err := bot.client.GuildRoles(e.ID)
+	roles, err := bot.client.GuildRoles(guildID)
 	if err != nil {
 		log.Errorln("Failed to get roles:", err)
 	}
@@ -150,11 +151,18 @@ func (bot *HelpBot) discordServerJoin(s *discordgo.Session, e *discordgo.GuildCr
 			continue
 		}
 
-		log.Info("Creating role: ", roleName, " in server: ", e.Name, " with id: ", e.ID)
-		role, err := bot.client.GuildRoleCreate(e.ID, &discordgo.RoleParams{
+		permission := &NoPermission
+		if roleName == RoleStudent {
+			permission = &permStudent
+		} else if roleName == RoleAssistant {
+			permission = &permAssistant
+		}
+
+		log.Info("Creating role: ", roleName, " in server with id: ", guildID)
+		role, err := bot.client.GuildRoleCreate(guildID, &discordgo.RoleParams{
 			Name:        roleName,
 			Hoist:       &Hoist,
-			Permissions: &NoPermission,
+			Permissions: permission,
 		})
 		if err != nil {
 			log.Errorln("Failed to create role:", err)
@@ -162,7 +170,8 @@ func (bot *HelpBot) discordServerJoin(s *discordgo.Session, e *discordgo.GuildCr
 		roleMap[roleName] = role.ID
 	}
 
-	bot.roles[e.ID] = roleMap
+	bot.roles[guildID] = roleMap
+	return nil
 }
 
 func (bot *HelpBot) createChannel(s *discordgo.Session, guildID, name string, roles ...string) error {
