@@ -285,36 +285,57 @@ func (bot *HelpBot) registerCommand(m *discordgo.InteractionCreate) {
 		return
 	}
 
-	found := false
+	var enrollment *qfpb.Enrollment
 	for _, e := range enrollments.Msg.GetEnrollments() {
 		if e.GetUser().GetLogin() == githubLogin {
-			newStudent.Name = e.GetUser().Name
-			newStudent.StudentID = e.GetUser().GetStudentID()
-			found = true
+			enrollment = e
 			break
 		}
 	}
 
-	if !found {
+	if enrollment.GetUser() == nil {
 		replyMsg(bot.client, m, "Failed to find your enrollment in the course")
 		return
 	}
 
-	// assign roles to student
-	if err := bot.db.CreateStudent(&newStudent); err != nil {
-		replyMsg(bot.client, m, "An uknown error occurred.")
+	newStudent.Name = enrollment.GetUser().GetName()
+	newStudent.UserID = m.Member.User.ID
+	newStudent.GithubLogin = githubLogin
+	newStudent.GuildID = m.GuildID
+
+	switch enrollment.GetStatus() {
+	case qfpb.Enrollment_STUDENT:
+		if err := bot.db.CreateStudent(&newStudent); err != nil {
+			replyMsg(bot.client, m, "An uknown error occurred.")
+			return
+		}
+		if err := bot.client.GuildMemberRoleAdd(m.GuildID, newStudent.UserID, studentRole); err != nil {
+			bot.log.Errorln("Failed to add student role:", err)
+			replyMsg(bot.client, m, "Failed to give you the student role.")
+			return
+		}
+	case qfpb.Enrollment_TEACHER:
+		if _, err := bot.db.GetOrCreateAssistant(&models.Assistant{
+			UserID:  newStudent.UserID,
+			GuildID: m.GuildID,
+		}); err != nil {
+			bot.log.Errorln("Failed to create assistant:", err)
+			replyMsg(bot.client, m, "Failed to create assistant.")
+		}
+		if err := bot.client.GuildMemberRoleAdd(m.GuildID, newStudent.UserID, bot.GetRole(m.GuildID, RoleAssistant)); err != nil {
+			bot.log.Errorln("Failed to add assistant role:", err)
+			replyMsg(bot.client, m, "Failed to give you the assistant role.")
+			return
+		}
+	default: // pending or none (not enrolled)
+		bot.log.Errorf("User is not enrolled in the course: (%s, %s)", newStudent.UserID, newStudent.GithubLogin)
+		replyMsg(bot.client, m, "You are not enrolled in the course.")
 		return
 	}
 
 	if err := bot.client.GuildMemberNickname(m.GuildID, newStudent.UserID, newStudent.Name); err != nil {
 		bot.log.Errorln("Failed to set nick:", err)
-		replyMsg(bot.client, m, "An uknown error occurred")
-		return
-	}
-
-	if err := bot.client.GuildMemberRoleAdd(m.GuildID, newStudent.UserID, studentRole); err != nil {
-		bot.log.Errorln("Failed to add student role:", err)
-		replyMsg(bot.client, m, "An uknown error occurred")
+		replyMsg(bot.client, m, "Failed to set your nickname.")
 		return
 	}
 

@@ -21,7 +21,7 @@ func NewQuickFeed(authToken string) (*QuickFeed, error) {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 	}
-	qf := qfconnect.NewQuickFeedServiceClient(&client, "https://127.0.0.1", connect.WithInterceptors(
+	qf := qfconnect.NewQuickFeedServiceClient(&client, "https://uis.itest.run", connect.WithInterceptors(
 		interceptor.NewTokenAuthClientInterceptor(authToken),
 	))
 	return &QuickFeed{

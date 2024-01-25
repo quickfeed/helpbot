@@ -15,6 +15,7 @@ require (
 require (
 	github.com/bufbuild/connect-go v1.10.0
 	github.com/bwmarrin/discordgo v0.27.1
+	github.com/jinzhu/gorm v1.9.16
 	go.uber.org/zap v1.25.0
 	gorm.io/driver/sqlite v1.5.3
 )

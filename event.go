@@ -57,11 +57,11 @@ func (bot *HelpBot) discordServerJoin(s *discordgo.Session, e *discordgo.GuildCr
 	_, err := bot.db.GetCourse(&models.Course{GuildID: e.ID})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		bot.log.Errorf("Failed to get course: %s", err)
-		bot.client.ChannelMessageSend(e.SystemChannelID, "This server has not been configured with a course. Please contact the server owner to configure this server for a course.")
+		//bot.client.ChannelMessageSend(e.SystemChannelID, "This server has not been configured with a course. Please contact the server owner to configure this server for a course.")
 
 		choices := courseChoices(bot.db)
 		if len(choices) == 0 {
-			bot.client.ChannelMessageSend(e.SystemChannelID, "There are no courses available to configure this server with. Please contact the server owner to add a course.")
+			//bot.client.ChannelMessageSend(e.SystemChannelID, "There are no courses available to configure this server with. Please contact the server owner to add a course.")
 			return
 		}
 		// TODO: Add a command to configure the server with a course
@@ -134,7 +134,7 @@ func (bot *HelpBot) initServer(s *discordgo.Session, guildID string) error {
 		log.Info("Registering command: ", cmd.Name, " in server with id: ", guildID)
 		_, err := bot.client.ApplicationCommandCreate(bot.cfg.AppID, guildID, cmd)
 		if err != nil {
-			log.Errorln("Failed to create global command:", err)
+			log.Errorln("Failed to create global command:", cmd.Name, err)
 		}
 	}
 

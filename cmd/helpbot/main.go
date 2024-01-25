@@ -51,7 +51,7 @@ func main() {
 
 	var bots []*helpbot.HelpBot
 
-	for _, c := range cfg {
+	for _, c := range cfg { 
 		bot, err := helpbot.New(c, log, ag)
 		if err != nil {
 			log.Fatalf("Failed to initialize bot: %v", err)
