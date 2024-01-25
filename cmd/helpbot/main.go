@@ -23,26 +23,24 @@ var log = &logrus.Logger{
 	Level:     logrus.InfoLevel,
 }
 
-var (
-	ag      *helpbot.Autograder
-	cfgFile string
-)
+var ag *helpbot.QuickFeed
 
 func main() {
+	var cfgFile string
 	flag.StringVar(&cfgFile, "config", ".helpbotrc", "Path to configuration file")
 	flag.Parse()
 
 	err := initConfig(cfgFile)
 	if err != nil {
-		log.Fatalln("Failed to read config:", err)
+		log.Fatalln("Failed to init config:", err)
 	}
 
-	if viper.GetBool("autograder") {
-		authToken := os.Getenv("QUICKFEED_AUTH_TOKEN")
+	if viper.GetBool("quickfeed") {
+		authToken := viper.GetString("auth-token")
 		if authToken == "" {
 			log.Fatalln("QUICKFEED_AUTH_TOKEN is not set")
 		}
-		ag, err = helpbot.NewAutograder(authToken)
+		ag, err = helpbot.NewQuickFeed(authToken)
 		if err != nil {
 			log.Fatalln("Failed to init autograder:", err)
 		}
@@ -53,7 +51,7 @@ func main() {
 
 	var bots []*helpbot.HelpBot
 
-	for _, c := range cfg {
+	for _, c := range cfg { 
 		bot, err := helpbot.New(c, log, ag)
 		if err != nil {
 			log.Fatalf("Failed to initialize bot: %v", err)
@@ -77,6 +75,27 @@ func main() {
 			b.Disconnect()
 		}
 		cancel()
-		ag.Close()
 	}
+}
+
+var cfg []helpbot.Config
+
+func initConfig(cfgFile string) (err error) {
+	// command line
+
+	// env
+	viper.SetEnvPrefix(botName)
+	viper.AutomaticEnv()
+
+	// config file
+	viper.SetConfigName(cfgFile)
+	viper.SetConfigType("toml")
+	viper.AddConfigPath(".")
+	err = viper.ReadInConfig()
+	if err != nil {
+		return
+	}
+
+	err = viper.UnmarshalKey("instances", &cfg)
+	return
 }
