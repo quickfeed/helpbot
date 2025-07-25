@@ -1,53 +1,54 @@
 package helpbot
 
 import (
-	"fmt"
-	"os"
 	"testing"
 
-	"github.com/jinzhu/gorm"
+	"github.com/Raytar/helpbot/database"
+	"github.com/Raytar/helpbot/models"
 )
 
-var db *gorm.DB
-
-func TestMain(m *testing.M) {
-	var err error
-	db, err = OpenDatabase("file::memory:?cache=shared")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	// viper.Set("db-path", "test.db")
-	ret := m.Run()
-	db.Close()
-	os.Exit(ret)
-}
-
 func TestCreateAndRetrieveHelpRequests(t *testing.T) {
-	db.Create(&HelpRequest{StudentUserID: "1", Student: Student{}, Done: true})
-	var req HelpRequest
-	db.Find(&req, "student_user_id = ?", 1)
-	if req.StudentUserID != "1" {
-		t.Fatalf("Failed to create and retrieve users")
+	db := setupTestDatabase(t)
+	defer db.Close()
+
+	db.CreateHelpRequest(&models.HelpRequest{StudentUserID: "1", GuildID: "1", Student: models.Student{}, Done: true})
+	req := &models.HelpRequest{StudentUserID: "1", GuildID: "1"}
+	got, err := db.GetHelpRequest(req)
+	if err != nil {
+		t.Fatalf("GetHelpRequest failed: %v", err)
+	}
+	if got.StudentUserID != "1" || got.GuildID != "1" || got.Done != true {
+		t.Errorf("GetHelpRequest returned wrong data: got %+v, want %+v", got, req)
 	}
 }
 
 func TestGetPosInQueue(t *testing.T) {
-	db.Create(&HelpRequest{StudentUserID: "1", Student: Student{}})
-	db.Create(&HelpRequest{StudentUserID: "2", Student: Student{}})
-	db.Create(&HelpRequest{StudentUserID: "3", Student: Student{}, Done: true})
-	db.Create(&HelpRequest{StudentUserID: "4", Student: Student{}})
+	db := setupTestDatabase(t)
+	defer db.Close()
+	db.CreateHelpRequest(&models.HelpRequest{StudentUserID: "1", GuildID: "1", Student: models.Student{}})
+	db.CreateHelpRequest(&models.HelpRequest{StudentUserID: "2", GuildID: "1", Student: models.Student{}})
+	db.CreateHelpRequest(&models.HelpRequest{StudentUserID: "3", GuildID: "1", Student: models.Student{}, Done: true})
+	db.CreateHelpRequest(&models.HelpRequest{StudentUserID: "4", GuildID: "1", Student: models.Student{}})
 
-	check := func(name string, want int) {
-		if pos, err := getPosInQueue(db, name); err != nil {
-			t.Errorf("getPosInQueue(%s): %v", name, err)
+	check := func(studentID, guildID string, want int) {
+		if pos, err := db.GetQueuePosition(guildID, studentID); err != nil {
+			t.Errorf("getPosInQueue(%s, %s): %v", studentID, guildID, err)
 		} else if pos != want {
-			t.Errorf("getPosInQueue(%s): got %d, want %d", name, pos, want)
+			t.Errorf("getPosInQueue(%s, %s): got %d, want %d", studentID, guildID, pos, want)
 		}
 	}
 
-	check("1", 1)
-	check("2", 2)
-	check("3", 0)
-	check("4", 3)
+	// Check positions in the queue
+	check("1", "1", 1)
+	check("2", "1", 2)
+	check("3", "1", 0)
+	check("4", "1", 3)
+}
+
+func setupTestDatabase(t *testing.T) *database.Database {
+	db, err := database.OpenDatabase("file::memory:?cache=shared", nil)
+	if err != nil {
+		t.Fatalf("Failed to open database: %v", err)
+	}
+	return db
 }
