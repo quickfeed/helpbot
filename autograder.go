@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"net/http"
 
-	"github.com/bufbuild/connect-go"
+	"connectrpc.com/connect"
 	"github.com/quickfeed/quickfeed/qf/qfconnect"
 )
 
@@ -19,9 +19,7 @@ func NewQuickFeed(authToken string) (*QuickFeed, error) {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 	}
-	qf := qfconnect.NewQuickFeedServiceClient(&client, "https://uis.itest.run", connect.WithInterceptors(
-		tokenAuthClientInterceptor(authToken),
-	))
+	qf := qfconnect.NewQuickFeedServiceClient(&client, "https://uis.itest.run", connect.WithInterceptors(tokenAuthClientInterceptor(authToken)))
 	return &QuickFeed{
 		qf: qf,
 	}, nil

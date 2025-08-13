@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"connectrpc.com/connect"
 	"github.com/Raytar/helpbot/database"
 	"github.com/Raytar/helpbot/models"
-	"github.com/bufbuild/connect-go"
 	"github.com/bwmarrin/discordgo"
 	qfpb "github.com/quickfeed/quickfeed/qf"
 	"github.com/sirupsen/logrus"
