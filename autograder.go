@@ -1,18 +1,16 @@
 package helpbot
 
 import (
+	"context"
 	"crypto/tls"
 	"net/http"
 
 	"github.com/bufbuild/connect-go"
 	"github.com/quickfeed/quickfeed/qf/qfconnect"
-	"github.com/quickfeed/quickfeed/web/interceptor"
-	"google.golang.org/grpc/metadata"
 )
 
 type QuickFeed struct {
 	qf qfconnect.QuickFeedServiceClient
-	md metadata.MD
 }
 
 func NewQuickFeed(authToken string) (*QuickFeed, error) {
@@ -22,10 +20,23 @@ func NewQuickFeed(authToken string) (*QuickFeed, error) {
 		},
 	}
 	qf := qfconnect.NewQuickFeedServiceClient(&client, "https://uis.itest.run", connect.WithInterceptors(
-		interceptor.NewTokenAuthClientInterceptor(authToken),
+		tokenAuthClientInterceptor(authToken),
 	))
 	return &QuickFeed{
 		qf: qf,
-		md: metadata.New(map[string]string{"Authorization": authToken}),
 	}, nil
+}
+
+// NewTokenAuthClientInterceptor returns a client interceptor that will add the given token in the Authorization header.
+func tokenAuthClientInterceptor(token string) connect.UnaryInterceptorFunc {
+	interceptor := func(next connect.UnaryFunc) connect.UnaryFunc {
+		return connect.UnaryFunc(func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+			if req.Spec().IsClient {
+				// Send a token with client requests.
+				req.Header().Set("Authorization", token)
+			}
+			return next(ctx, req)
+		})
+	}
+	return connect.UnaryInterceptorFunc(interceptor)
 }
