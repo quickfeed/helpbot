@@ -140,6 +140,7 @@ func GetCommands(course *models.Course) []*discordgo.ApplicationCommand {
 		},
 		{
 			Name:                     "config",
+			Description:              "Configure this server with a course.",
 			DefaultMemberPermissions: &permAdmin,
 			Options: []*discordgo.ApplicationCommandOption{
 				{
