@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"connectrpc.com/connect"
 	"github.com/Raytar/helpbot/database"
 	"github.com/Raytar/helpbot/models"
-	"github.com/bufbuild/connect-go"
 	"github.com/bwmarrin/discordgo"
 	qfpb "github.com/quickfeed/quickfeed/qf"
 	"github.com/sirupsen/logrus"
@@ -172,7 +172,7 @@ var (
 		discordgo.PermissionAddReactions |
 		discordgo.PermissionUseExternalEmojis |
 		discordgo.PermissionReadMessageHistory |
-		discordgo.PermissionUseSlashCommands |
+		discordgo.PermissionUseApplicationCommands |
 		discordgo.PermissionVoiceConnect |
 		discordgo.PermissionVoiceSpeak |
 		discordgo.PermissionVoiceStreamVideo |
@@ -189,7 +189,7 @@ var (
 		discordgo.PermissionMentionEveryone |
 		discordgo.PermissionVoiceMoveMembers |
 		discordgo.PermissionManageThreads
-	permAdmin int64 = discordgo.PermissionAdministrator
+	permAdmin int64 = discordgo.PermissionManageGuild
 )
 
 func New(cfg Config, log *logrus.Logger, qf *QuickFeed) (bot *HelpBot, err error) {
