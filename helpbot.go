@@ -172,7 +172,7 @@ var (
 		discordgo.PermissionAddReactions |
 		discordgo.PermissionUseExternalEmojis |
 		discordgo.PermissionReadMessageHistory |
-		discordgo.PermissionUseSlashCommands |
+		discordgo.PermissionUseApplicationCommands |
 		discordgo.PermissionVoiceConnect |
 		discordgo.PermissionVoiceSpeak |
 		discordgo.PermissionVoiceStreamVideo |
@@ -189,7 +189,7 @@ var (
 		discordgo.PermissionMentionEveryone |
 		discordgo.PermissionVoiceMoveMembers |
 		discordgo.PermissionManageThreads
-	permAdmin int64 = discordgo.PermissionAdministrator
+	permAdmin int64 = discordgo.PermissionManageGuild
 )
 
 func New(cfg Config, log *logrus.Logger, qf *QuickFeed) (bot *HelpBot, err error) {
