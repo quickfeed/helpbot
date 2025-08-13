@@ -2,162 +2,114 @@ package helpbot
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
-	"strconv"
 	"strings"
-	"text/template"
 	"time"
 
-	"github.com/andersfylling/disgord"
-	agpb "github.com/autograde/quickfeed/ag"
-	"github.com/jinzhu/gorm"
-	"google.golang.org/grpc/metadata"
+	"github.com/Raytar/helpbot/models"
+	"github.com/bufbuild/connect-go"
+	"github.com/bwmarrin/discordgo"
+	qfpb "github.com/quickfeed/quickfeed/qf"
 )
 
-type command func(m *disgord.MessageCreate)
+type command func(m *discordgo.InteractionCreate)
 
 type commandMap map[string]command
 
 func (bot *HelpBot) initCommands() {
-	bot.baseCommands = commandMap{
-		"help":     bot.baseHelpCommand,
-		"register": bot.registerCommand,
-	}
-	bot.studentCommands = commandMap{
-		"help":    bot.studentHelpCommand,
-		"gethelp": func(m *disgord.MessageCreate) { bot.helpRequestCommand(m, "help") },
-		"approve": func(m *disgord.MessageCreate) { bot.helpRequestCommand(m, "approve") },
-		"cancel":  bot.cancelRequestCommand,
-		"status":  bot.studentStatusCommand,
-	}
-	bot.assistantCommands = commandMap{
-		"help":       bot.assistantHelpCommand,
-		"length":     bot.lengthCommand,
-		"list":       bot.listCommand,
-		"next":       bot.nextRequestCommand,
-		"clear":      bot.clearCommand,
-		"unregister": bot.unregisterCommand,
-		"cancel":     bot.assistantCancelCommand,
+	bot.commands = commandMap{
+		// base commands
+		"help":      bot.helpCommand,
+		"register":  bot.registerCommand,
+		"configure": bot.configureCommand,
+
+		// student commands
+		"gethelp": bot.hasRole(func(m *discordgo.InteractionCreate) { bot.helpRequestCommand(m, "help") }, RoleStudent),
+		"approve": bot.hasRole(func(m *discordgo.InteractionCreate) { bot.helpRequestCommand(m, "approve") }, RoleStudent),
+		"cancel":  bot.hasRole(bot.cancelRequestCommand, RoleStudent),
+		"status":  bot.hasRole(bot.studentStatusCommand, RoleStudent),
+
+		// assistant commands
+		"length":         bot.hasRole(bot.lengthCommand, RoleAssistant),
+		"list":           bot.hasRole(bot.listCommand, RoleAssistant),
+		"next":           bot.hasRole(bot.nextRequestCommand, RoleAssistant),
+		"clear":          bot.hasRole(bot.clearCommand, RoleAssistant),
+		"unregister":     bot.hasRole(bot.unregisterCommand, RoleAssistant),
+		"cancel-waiting": bot.hasRole(bot.assistantCancelCommand, RoleAssistant),
 	}
 }
 
-var privacy = `
-Data collection and privacy:
-By using this bot, you consent that your full name, student id, and discord id may be collected for the purposes of
-identifying you on this server. If you wish to delete your data, please contact a teaching assistant.`
+var baseHelp = createModal("Available commands",
+	``+"```"+`
+help:                       Shows this help text
+register [course] [GitHub username]: Register your discord account as a student.
+`+"```", true)
 
-var baseHelp = createTemplate("baseHelp", `Available commands:
-`+"```"+`
-{{.Prefix}}help                       Shows this help text
-{{.Prefix}}register [github username] Register your discord account as a student.
-`+"```"+privacy)
-
-var studentHelp = createTemplate("studentHelp", `Available commands:
-`+"```"+`
-{{.Prefix}}help:    Shows this help text
-{{.Prefix}}gethelp: Request help from a teaching assistant
-{{.Prefix}}approve: Get your lab approved by a teaching assistant
-{{.Prefix}}cancel:  Cancels your help request and removes you from the queue
-{{.Prefix}}status:  Show your position in the queue
+var studentHelp = createModal("Student Commands",
+	``+"```"+`
+help:    Shows this help text
+gethelp: Request help from a teaching assistant
+approve: Get your lab approved by a teaching assistant
+cancel:  Cancels your help request and removes you from the queue
+status:  Show your position in the queue
 `+"```"+`
 After requesting help, you can check the response message you got to see your position in the queue.
 You will receive a message when you are next in queue.
-`+privacy)
+`, true)
 
-var assistant = createTemplate("assistantHelp", `Teaching Assistant commands:
-`+"```"+`
-{{.Prefix}}help:               Shows this help text
-{{.Prefix}}length:             Returns the number of students waiting for help.
-{{.Prefix}}list <num>:         Lists the next <num> students in the queue.
-{{.Prefix}}next:               Removes and returns the first student from the queue.
-{{.Prefix}}clear:              Clears the queue!
-{{.Prefix}}unregister @mention Unregisters the mentioned user.
-{{.Prefix}}cancel              Cancels your 'waiting' status.
-`+"```"+privacy)
+var assistant = createModal("Teaching Assistant Commands",
+	``+"```"+`
+help:               Shows this help text
+length:             Returns the number of students waiting for help.
+list <num>:         Lists the next <num> students in the queue.
+next:               Removes and returns the first student from the queue.
+clear:              Clears the queue!
+unregister @mention Unregisters the mentioned user.
+cancel              Cancels your 'waiting' status.
+`+"```", true)
 
-func (bot *HelpBot) helpCommand(m *disgord.MessageCreate, helpTmpl *template.Template) error {
-	buf := new(strings.Builder)
-	err := helpTmpl.Execute(buf, bot.cfg)
-	if err != nil {
-		return fmt.Errorf("helpCommand: failed to execute template: %w", err)
-	}
-	replyMsg(bot.client, m, buf.String())
-	return nil
-}
-
-func (bot *HelpBot) baseHelpCommand(m *disgord.MessageCreate) {
-	err := bot.helpCommand(m, baseHelp)
-	if err != nil {
-		bot.log.Error(err)
-	}
-}
-
-func (bot *HelpBot) studentHelpCommand(m *disgord.MessageCreate) {
-	err := bot.helpCommand(m, studentHelp)
-	if err != nil {
-		bot.log.Error(err)
-	}
-}
-
-func (bot *HelpBot) assistantHelpCommand(m *disgord.MessageCreate) {
-	err := bot.helpCommand(m, assistant)
-	if err != nil {
-		bot.log.Error(err)
-	}
-}
-
-func (bot *HelpBot) helpRequestCommand(m *disgord.MessageCreate, requestType string) {
-	// create a transaction such that getPos... and Create... are performed atomically
-	tx := bot.db.Begin()
-	defer tx.RollbackUnlessCommitted()
-
-	// check if an open request already exists
-	pos, err := getPosInQueue(tx, m.Message.Author.ID)
-	if err != nil {
-		bot.log.Errorln("helpRequest: failed to get user pos in queue")
-		replyMsg(bot.client, m, "An error occurred while creating your request.")
+func (bot *HelpBot) helpCommand(m *discordgo.InteractionCreate) {
+	// check if the user has the teaching assistant role
+	if bot.hasRoles(m.GuildID, m.Member, RoleAssistant) {
+		replyModal(bot.client, m, assistant)
 		return
 	}
-
-	// already in the queue, no need to do anything.
-	if pos > 0 {
-		replyMsg(bot.client, m, fmt.Sprintf("You are already at postition %d in the queue", pos))
+	// check if the user has the student role
+	if bot.hasRoles(m.GuildID, m.Member, RoleStudent) {
+		replyModal(bot.client, m, studentHelp)
 		return
 	}
+	// user has no roles, show base help
+	replyModal(bot.client, m, baseHelp)
+}
 
-	req := HelpRequest{
-		StudentUserID: m.Message.Author.ID,
+func (bot *HelpBot) helpRequestCommand(m *discordgo.InteractionCreate, requestType string) {
+	req := models.HelpRequest{
+		StudentUserID: m.Member.User.ID,
+		GuildID:       m.GuildID,
 		Type:          requestType,
 		Done:          false,
 	}
 
-	err = tx.Create(&req).Error
+	err := bot.db.CreateHelpRequest(&req)
 	if err != nil {
 		bot.log.Errorln("helpRequest: failed to create new request:", err)
-		replyMsg(bot.client, m, "An error occurred while creating your request.")
+		replyMsg(bot.client, m, fmt.Sprintf("An error occurred while creating your request: %s", err.Error()))
 		return
 	}
 
-	if bot.assignToIdleAssistant(m.Ctx, tx, req) {
-		tx.Commit()
-		return
-	}
-
-	pos, err = getPosInQueue(tx, m.Message.Author.ID)
+	pos, err := bot.db.GetQueuePosition(m.GuildID, m.Member.User.ID)
 	if err != nil {
 		bot.log.Errorln("helpRequest: failed to get pos in queue after creating request:", err)
 		replyMsg(bot.client, m, "An error occurred while creating your request.")
 		return
 	}
-	tx.Commit()
 
 	replyMsg(bot.client, m, fmt.Sprintf("A help request has been created, and you are at position %d in the queue.", pos))
 }
 
-func (bot *HelpBot) studentStatusCommand(m *disgord.MessageCreate) {
-	pos, err := getPosInQueue(bot.db, m.Message.Author.ID)
+func (bot *HelpBot) studentStatusCommand(m *discordgo.InteractionCreate) {
+	pos, err := bot.db.GetQueuePosition(m.GuildID, m.Member.User.ID)
 	if err != nil {
 		bot.log.Errorln("studentStatus: failed to get position in queue:", err)
 		replyMsg(bot.client, m, "An error occurred.")
@@ -170,226 +122,68 @@ func (bot *HelpBot) studentStatusCommand(m *disgord.MessageCreate) {
 	replyMsg(bot.client, m, fmt.Sprintf("You are at position %d in the queue.", pos))
 }
 
-// assignToIdleAssistant will check if any assistants are waiting for a request and pick one of them to handle req.
-// db must be a transaction.
-func (bot *HelpBot) assignToIdleAssistant(ctx context.Context, db *gorm.DB, req HelpRequest) bool {
-	err := db.Where("waiting = ?", true).Order("last_request ASC").First(&req.Assistant).Error
-	if gorm.IsRecordNotFoundError(err) {
-		return false
-	} else if err != nil {
-		bot.log.Errorln("Failed to query for idle assistants:", err)
-		return false
+func (bot *HelpBot) cancelRequestCommand(m *discordgo.InteractionCreate) {
+	if err := bot.db.CancelHelpRequest(m.GuildID, m.Member.User.ID); err != nil {
+		replyMsg(bot.client, m, fmt.Sprintf("No active request found: %s", err))
+	} else {
+		replyMsg(bot.client, m, "Your request was cancelled.")
 	}
-
-	studUser, err := bot.client.GetMember(ctx, bot.cfg.Guild, req.StudentUserID)
-	if err != nil {
-		bot.log.Errorln("Failed to retrieve user info for student:", err)
-		return false
-	}
-
-	assistantUser, err := bot.client.GetMember(ctx, bot.cfg.Guild, req.Assistant.UserID)
-	if err != nil {
-		bot.log.Errorln("Failed to retrieve user info for assistant:", err)
-		return false
-	}
-
-	req.Assistant.LastRequest = time.Now()
-	req.Assistant.Waiting = false
-	req.Done = true
-	req.DoneAt = req.Assistant.LastRequest
-	req.Reason = "assistantNext"
-
-	// need to do this update assistant manually, as zero-valued struct fields are ignored
-	err = db.Model(&Assistant{}).Where("user_id = ?", req.Assistant.UserID).UpdateColumns(map[string]interface{}{
-		"waiting":      req.Assistant.Waiting,
-		"last_request": req.Assistant.LastRequest,
-	}).Error
-	if err != nil {
-		bot.log.Errorln("Failed to update assistant status:", err)
-		return false
-	}
-
-	err = db.Model(&HelpRequest{}).Update(&req).Error
-	if err != nil {
-		bot.log.Errorln("Failed to update request:", err)
-		return false
-	}
-
-	if !sendMsg(ctx, bot.client, assistantUser.User, fmt.Sprintf("Next '%s' request is by %s", req.Type,
-		getMentionAndNick(studUser))) {
-		return false
-	}
-
-	if !sendMsg(ctx, bot.client, studUser.User, fmt.Sprintf("You will now receive help from %s.",
-		getMentionAndNick(assistantUser))) {
-		return false
-	}
-
-	return true
 }
 
-func getPosInQueue(db *gorm.DB, userID disgord.Snowflake) (rowNumber int, err error) {
-	err = db.Raw(`
-		select row_number from (
-			select
-				row_number () over (
-					order by created_at asc
-				) row_number,
-				student_user_id
-			from
-				help_requests
-			where
-				done = false
-		) t
-		where
-			student_user_id = ?`,
-		userID,
-	).Row().Scan(&rowNumber)
-
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return -1, fmt.Errorf("getPosInQueue error: %w", err)
-	}
-
-	return rowNumber, nil
-}
-
-func (bot *HelpBot) cancelRequestCommand(m *disgord.MessageCreate) {
-	err := bot.db.Model(&HelpRequest{}).Where("student_user_id = ?", m.Message.Author.ID).Updates(map[string]interface{}{
-		"done":    true,
-		"reason":  "userCancel",
-		"done_at": time.Now(),
-	}).Error
-	if gorm.IsRecordNotFoundError(err) {
-		replyMsg(bot.client, m, "You do not have an active help request.")
-		return
-	} else if err != nil {
-		replyMsg(bot.client, m, "An unknown error occurred.")
-		return
-	}
-	replyMsg(bot.client, m, "Your request was cancelled.")
-}
-
-func (bot *HelpBot) nextRequestCommand(m *disgord.MessageCreate) {
-	// register assistant in DB
-	var assistant Assistant
-	err := bot.db.Where("user_id = ?", m.Message.Author.ID).First(&assistant).Error
-	if gorm.IsRecordNotFoundError(err) {
-		err := bot.db.Create(&Assistant{
-			UserID:  m.Message.Author.ID,
-			Waiting: false,
-		}).Error
-		if err != nil {
-			bot.log.Errorln("Failed to create assistant record:", err)
-		}
-	} else if err != nil {
-		bot.log.Errorln("Failed to store assistant in DB:", err)
-	}
-
-	tx := bot.db.Begin()
-	defer tx.RollbackUnlessCommitted()
-
-	var req HelpRequest
-	err = tx.Where("done = ?", false).Order("created_at asc").First(&req).Error
-	if gorm.IsRecordNotFoundError(err) {
-		assistant.UserID = m.Message.Author.ID
-		assistant.Waiting = true
-		err := tx.Model(&Assistant{}).Update(&assistant).Error
-		if err != nil {
-			bot.log.Errorln("Failed to update waiting state for assistant:", err)
-			replyMsg(bot.client, m, "There are no more requests in the queue, but due to an error, you won't receive a notification when the next one arrives.")
-			return
-		}
-		if !replyMsg(bot.client, m, "There are no more requests in the queue. You will receive a message when the next request arrives.") {
-			return
-		}
-		tx.Commit()
-		return
-	} else if err != nil {
-		bot.log.Errorln("Failed to get next user:", err)
-		replyMsg(bot.client, m, "An unknown error occurred.")
-		return
-	}
-
-	req.Assistant = assistant
-	req.Assistant.LastRequest = time.Now()
-	req.Done = true
-	req.DoneAt = req.Assistant.LastRequest
-	req.Reason = "assistantNext"
-
-	err = tx.Model(&HelpRequest{}).Update(&req).Error
+func (bot *HelpBot) nextRequestCommand(m *discordgo.InteractionCreate) {
+	request, err := bot.db.AssignNextRequest(m.Member.User.ID, m.GuildID)
 	if err != nil {
-		bot.log.Errorln("Failed to update request:", err)
-		replyMsg(bot.client, m, "An error occurred while updating request.")
+		bot.log.Errorf("Failed to assign next request: %v by user: %s in guild: %s", err, m.Member.User.ID, m.GuildID)
+		replyMsg(bot.client, m, fmt.Sprintf("Failed to assign next request: %s", err))
 		return
 	}
 
-	err = tx.Model(&Assistant{}).Update(&req.Assistant).Error
-	if err != nil {
-		bot.log.Errorln("Failed to update assistant:", err)
-		replyMsg(bot.client, m, "An error occurred while updating assistant status.")
+	if request == nil || request.StudentUserID == "" {
+		replyMsg(bot.client, m, "No requests in queue.")
 		return
 	}
-
-	student, err := bot.client.GetMember(m.Ctx, bot.cfg.Guild, req.StudentUserID)
+	student, err := bot.client.GuildMember(m.GuildID, request.StudentUserID)
 	if err != nil {
 		bot.log.Errorln("Failed to fetch user:", err)
 		replyMsg(bot.client, m, "An unknown error occurred.")
 		return
 	}
 
-	assistantMember, err := bot.client.GetMember(m.Ctx, bot.cfg.Guild, m.Message.Author.ID)
-	if err != nil {
-		bot.log.Errorln("Failed to fetch user:", err)
-		replyMsg(bot.client, m, "An unknown error occurred.")
+	if !replyMsg(bot.client, m, fmt.Sprintf("Next '%s' request is by %s.", request.Type, getMentionAndNick(student))) {
 		return
 	}
-
-	if !replyMsg(bot.client, m, fmt.Sprintf("Next '%s' request is by %s.", req.Type, getMentionAndNick(student))) {
-		return
-	}
-
-	sendMsg(m.Ctx, bot.client, student.User, fmt.Sprintf("You will now receive help from %s", getMentionAndNick(assistantMember)))
-
-	tx.Commit()
+	sendMsg(bot.client, student.User, fmt.Sprintf("You will now receive help from %s", getMentionAndNick(m.Member)))
 }
 
-func (bot *HelpBot) lengthCommand(m *disgord.MessageCreate) {
-	var length int
-	err := bot.db.Model(&HelpRequest{}).Where("done = ?", false).Count(&length).Error
+func (bot *HelpBot) lengthCommand(m *discordgo.InteractionCreate) {
+	requests, err := bot.db.GetWaitingRequests(m.GuildID, 0)
 	if err != nil {
-		bot.log.Errorln("Failed to count number of open requests:", err)
 		replyMsg(bot.client, m, "An error occurred.")
 		return
 	}
-
 	var msg string
-	if length == 1 {
+	if len(requests) == 1 {
 		msg = "There is 1 student waiting for help."
 	} else {
-		msg = fmt.Sprintf("There are %d students waiting for help.", length)
+		msg = fmt.Sprintf("There are %d students waiting for help.", len(requests))
 	}
 	replyMsg(bot.client, m, msg)
 }
 
-func (bot *HelpBot) listCommand(m *disgord.MessageCreate) {
-	words := strings.Fields(m.Message.Content)
-
+func (bot *HelpBot) listCommand(m *discordgo.InteractionCreate) {
 	num := 10
+
+	options := m.ApplicationCommandData().Options
+
 	var err error
 
-	if len(words) >= 2 {
-		num, err = strconv.Atoi(words[1])
-		if err != nil {
-			replyMsg(bot.client, m, fmt.Sprintf("'%s' is not a vaild number.", words[1]))
-			return
-		}
+	if len(options) >= 1 {
+		num = int(options[0].IntValue())
 	}
 
 	var sb strings.Builder
-	var requests []HelpRequest
-	err = bot.db.Where("done = ?", false).Order("created_at asc").Limit(num).Find(&requests).Error
+	requests, err := bot.db.GetWaitingRequests(m.GuildID, num)
 	if err != nil {
-		bot.log.Errorln("Failed to get requests:", err)
 		replyMsg(bot.client, m, "Failed to get list of requests.")
 		return
 	}
@@ -401,7 +195,7 @@ func (bot *HelpBot) listCommand(m *disgord.MessageCreate) {
 
 	fmt.Fprintf(&sb, "Showing the next %d requests:\n\n", len(requests))
 	for i, req := range requests {
-		user, err := bot.client.GetMember(m.Ctx, bot.cfg.Guild, req.StudentUserID)
+		user, err := bot.client.GuildMember(m.GuildID, req.StudentUserID)
 		if err != nil {
 			bot.log.Errorln("Failed to obtain user info:", err)
 			replyMsg(bot.client, m, "An error occurred while sending the message")
@@ -412,24 +206,20 @@ func (bot *HelpBot) listCommand(m *disgord.MessageCreate) {
 	replyMsg(bot.client, m, sb.String())
 }
 
-func (bot *HelpBot) clearCommand(m *disgord.MessageCreate) {
-	words := strings.Fields(m.Message.Content)
-	if len(words) < 2 || words[1] != "YES" {
-		replyMsg(bot.client, m, fmt.Sprintf(
-			"This command will cancel all the requests in the queue. If you really want to do this, type `%sclear YES`",
-			bot.cfg.Prefix,
-		))
+func (bot *HelpBot) clearCommand(m *discordgo.InteractionCreate) {
+	data := m.ApplicationCommandData().Options
+	if len(data) < 1 || data[0].Type != discordgo.ApplicationCommandOptionBoolean {
+		replyMsg(bot.client, m, "You must specify whether to clear the queue or not.")
+		return
+	}
+
+	if !data[0].BoolValue() {
+		replyMsg(bot.client, m, "No changes were made to the queue.")
 		return
 	}
 
 	// TODO: send a message to each student whose request was cleared.
-	err := bot.db.Model(&HelpRequest{}).Where("done = ? ", false).Updates(map[string]interface{}{
-		"done":              true,
-		"done_at":           time.Now(),
-		"assistant_user_id": m.Message.Author.ID,
-		"reason":            "assistantClear",
-	}).Error
-	if err != nil {
+	if err := bot.db.ClearHelpRequests(m.Member.User.ID, m.GuildID); err != nil {
 		bot.log.Errorln("Failed to clear queue:", err)
 		replyMsg(bot.client, m, "Clear failed due to an error.")
 		return
@@ -438,170 +228,209 @@ func (bot *HelpBot) clearCommand(m *disgord.MessageCreate) {
 	replyMsg(bot.client, m, "The queue was cleared.")
 }
 
-func (bot *HelpBot) registerCommand(m *disgord.MessageCreate) {
-	words := strings.Fields(m.Message.Content)
-	if len(words) < 2 {
+func (bot *HelpBot) registerCommand(m *discordgo.InteractionCreate) {
+	// Check if course is configured
+	course, err := bot.db.GetCourse(&models.Course{GuildID: m.GuildID})
+	if err != nil {
+		bot.log.Errorln("Failed to get course:", err)
+		replyMsg(bot.client, m, "An unknown error occurred.")
+		return
+	}
+
+	// Check if role exists
+	studentRole := bot.GetRole(m.GuildID, RoleStudent)
+	if len(studentRole) == 0 {
+		fmt.Printf("Failed to find student role for register command. Message: %+v Data: %+v\n", m.Message, m.Data)
+		replyMsg(bot.client, m, "Failed to find student role.")
+		return
+	}
+
+	if len(m.ApplicationCommandData().Options) == 0 {
+		fmt.Printf("No github login provided for register command. Message: %+v Data: %+v\n", m.Message, m.Data)
+		replyMsg(bot.client, m, "You must include your github username in the command.")
+		return
+	}
+	githubLogin, ok := m.ApplicationCommandData().Options[0].Value.(string)
+	if !ok {
+		fmt.Printf("Failed to parse github login for register command. Message: %+v Data: %+v\n", m.Message, m.Data)
 		replyMsg(bot.client, m, "You must include your github username in the command.")
 		return
 	}
 
-	githubLogin := words[1]
-
-	// only allow one user per github login
-	var count int
-	err := bot.db.Model(&Student{}).Where("github_login = ?", githubLogin).Count(&count).Error
+	student, err := bot.db.GetStudent(&models.Student{UserID: m.Member.User.ID, GithubLogin: githubLogin})
 	if err != nil {
 		bot.log.Errorln("Failed to check for existing user:", err)
 		replyMsg(bot.client, m, "An unknown error occurred.")
 		return
 	}
 
-	if count > 0 {
+	if student != nil {
 		replyMsg(bot.client, m, "That github login has already been used to register! If you believe that this is a mistake, please contact a teaching assistant.")
 		return
 	}
 
-	membership, _, err := bot.gh.Organizations.GetOrgMembership(m.Ctx, githubLogin, bot.cfg.GitHubOrg)
-	if err != nil {
-		bot.log.Infof("Failed to get org membership for user '%s': %v\n", githubLogin, err)
-		replyMsg(bot.client, m,
-			"We were unable to verify that you are a member of the course's GitHub organization")
-		return
-	}
-
-	if membership.GetState() != "active" {
-		replyMsg(bot.client, m, fmt.Sprintf(
-			"Please make sure that you have accepted the invitation to join the '%s' organization on GitHub",
-			bot.cfg.GitHubOrg))
-		return
-	}
-
-	student := Student{
-		UserID:      m.Message.Author.ID,
+	newStudent := models.Student{
+		UserID:      m.Member.User.ID,
 		GithubLogin: githubLogin,
 	}
 
 	// TODO: query autograder for real name, using github login for now
-	if bot.cfg.Autograder {
-		ctx, cancel := context.WithTimeout(m.Ctx, 1*time.Second)
-		defer cancel()
-		ctx = metadata.NewOutgoingContext(ctx, bot.ag.md)
-		req := &agpb.CourseUserRequest{
-			CourseCode: bot.cfg.CourseCode,
-			CourseYear: bot.cfg.CourseYear,
-			UserLogin:  githubLogin,
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	req := &qfpb.EnrollmentRequest{
+		FetchMode: &qfpb.EnrollmentRequest_CourseID{CourseID: uint64(course.CourseID)},
+	}
+	enrollments, err := bot.qf.qf.GetEnrollments(ctx, connect.NewRequest(req))
+	if err != nil {
+		bot.log.Errorln("Failed to get info from QuickFeed:", err)
+		replyMsg(bot.client, m, "Failed to communicate with QuickFeed")
+		return
+	}
+
+	var enrollment *qfpb.Enrollment
+	for _, e := range enrollments.Msg.GetEnrollments() {
+		if e.GetUser().GetLogin() == githubLogin {
+			enrollment = e
+			break
 		}
-		userInfo, err := bot.ag.GetUserByCourse(ctx, req)
-		if err != nil {
-			bot.log.Errorln("Failed to get info from autograder:", err)
-			replyMsg(bot.client, m, "Failed to communicate with autograder")
+	}
+
+	if enrollment.GetUser() == nil {
+		replyMsg(bot.client, m, "Failed to find your enrollment in the course")
+		return
+	}
+
+	newStudent.Name = enrollment.GetUser().GetName()
+	newStudent.UserID = m.Member.User.ID
+	newStudent.GithubLogin = githubLogin
+	newStudent.GuildID = m.GuildID
+
+	switch enrollment.GetStatus() {
+	case qfpb.Enrollment_STUDENT:
+		if err := bot.db.CreateStudent(&newStudent); err != nil {
+			replyMsg(bot.client, m, "An uknown error occurred.")
 			return
 		}
-		student.Name = userInfo.GetName()
-		student.StudentID = userInfo.GetStudentID()
-	}
-
-	// assign roles to student
-	gm, err := bot.client.GetMember(m.Ctx, bot.cfg.Guild, m.Message.Author.ID)
-	if err != nil {
-		bot.log.Errorln("Failed to get member info:", err)
-		replyMsg(bot.client, m, "An unknown error occurred")
+		if err := bot.client.GuildMemberRoleAdd(m.GuildID, newStudent.UserID, studentRole); err != nil {
+			bot.log.Errorln("Failed to add student role:", err)
+			replyMsg(bot.client, m, "Failed to give you the student role.")
+			return
+		}
+	case qfpb.Enrollment_TEACHER:
+		if _, err := bot.db.GetOrCreateAssistant(&models.Assistant{
+			UserID:  newStudent.UserID,
+			GuildID: m.GuildID,
+		}); err != nil {
+			bot.log.Errorln("Failed to create assistant:", err)
+			replyMsg(bot.client, m, "Failed to create assistant.")
+		}
+		if err := bot.client.GuildMemberRoleAdd(m.GuildID, newStudent.UserID, bot.GetRole(m.GuildID, RoleAssistant)); err != nil {
+			bot.log.Errorln("Failed to add assistant role:", err)
+			replyMsg(bot.client, m, "Failed to give you the assistant role.")
+			return
+		}
+	default: // pending or none (not enrolled)
+		bot.log.Errorf("User is not enrolled in the course: (%s, %s)", newStudent.UserID, newStudent.GithubLogin)
+		replyMsg(bot.client, m, "You are not enrolled in the course.")
 		return
 	}
 
-	err = bot.db.Create(&student).Error
-	if err != nil {
-		bot.log.Errorln("Failed to store student in database:", err)
-		replyMsg(bot.client, m, "An uknown error occurred.")
-		return
-	}
-
-	err = gm.UpdateNick(m.Ctx, bot.client, student.Name)
-	if err != nil {
+	if err := bot.client.GuildMemberNickname(m.GuildID, newStudent.UserID, newStudent.Name); err != nil {
 		bot.log.Errorln("Failed to set nick:", err)
-		replyMsg(bot.client, m, "An uknown error occurred")
+		replyMsg(bot.client, m, "Failed to set your nickname.")
 		return
 	}
 
-	err = bot.client.AddGuildMemberRole(m.Ctx, bot.cfg.Guild, m.Message.Author.ID, bot.cfg.StudentRole)
-	if err != nil {
-		bot.log.Errorln("Failed to add student role:", err)
-		replyMsg(bot.client, m, "An uknown error occurred")
-		return
-	}
-
-	replyMsg(bot.client, m, fmt.Sprintf(
-		"Authentication was successful! You should now have more access to the server. Type %shelp to see available commands",
-		bot.cfg.Prefix))
+	replyMsg(bot.client, m, "Authentication was successful! You should now have more access to the server. Type /help to see available commands")
 }
 
-func (bot *HelpBot) unregisterCommand(m *disgord.MessageCreate) {
-	if len(m.Message.Mentions) < 1 {
-		replyMsg(bot.client, m, "You must `@mention` a user to unregister.")
+func (bot *HelpBot) unregisterCommand(m *discordgo.InteractionCreate) {
+	if m.Member == nil {
+		replyMsg(bot.client, m, "You must be a member of the server to use this command.")
 		return
 	}
 
-	user := m.Message.Mentions[0]
+	user := m.Member.User
 
 	// permanent deletion from db
-	err := bot.db.Unscoped().Delete(&Student{}, "user_id = ?", user.ID).Error
+	err := bot.db.DeleteStudent(&models.Student{UserID: user.ID})
 	if err != nil {
 		replyMsg(bot.client, m, "Failed to delete user info.")
 		bot.log.Errorln("Failed to delete student info:", err)
 		return
 	}
 
-	gm, err := bot.client.GetMember(m.Ctx, bot.cfg.Guild, user.ID)
-	if err != nil {
-		replyMsg(bot.client, m, "Failed to get member info. You may have to remove role/nickname manually.")
-		bot.log.Errorln("Failed to get member info:", err)
-		return
-	}
-
-	// clear nick
-	err = gm.UpdateNick(m.Ctx, bot.client, "")
-	if err != nil {
+	// remove nickname
+	if err := bot.client.GuildMemberNickname(m.GuildID, user.ID, ""); err != nil {
 		replyMsg(bot.client, m, "Failed to remove user nick. You may have to remove role/nickname manually.")
 		bot.log.Errorln("Failed to remove user nick:", err)
 		return
 	}
 
 	// unassign role
-	err = bot.client.RemoveGuildMemberRole(m.Ctx, bot.cfg.Guild, user.ID, bot.cfg.StudentRole)
-	if err != nil {
+	// TODO: Get the student role from database, not cfg
+	if err := bot.client.GuildMemberRoleRemove(m.GuildID, user.ID, "bot.cfg.StudentRole"); err != nil {
 		replyMsg(bot.client, m, "Failed to remove user roles. You may have to remove role/nickname manually.")
 		bot.log.Errorln("Failed to remove user roles:", err)
 		return
 	}
-
 	replyMsg(bot.client, m, "User was unregistered.")
 }
 
-func (bot *HelpBot) assistantCancelCommand(m *disgord.MessageCreate) {
-	tx := bot.db.Begin()
-	defer tx.RollbackUnlessCommitted()
-
-	var assistant Assistant
-	err := tx.Where("user_id = ?", m.Message.Author.ID).First(&assistant).Error
+func (bot *HelpBot) assistantCancelCommand(m *discordgo.InteractionCreate) {
+	err := bot.db.CancelWaitingAssistant(m.Member.User.ID)
 	if err != nil {
-		bot.log.Errorln("Failed to get assistant from DB:", err)
-		replyMsg(bot.client, m, "An unknown error occurred")
+		replyMsg(bot.client, m, fmt.Sprintf("Failed to cancel waiting status: %v", err))
+		return
+	}
+	replyMsg(bot.client, m, "Your waiting status was removed (you will have to use /next again to get the next student)")
+}
+
+// hasRole returns a function that checks if the user has the specified role, and then calls the original function.
+// If the user does not have the role, a message is sent to the user saying that they do not have permission to use the command.
+// This function is used to wrap the command functions to check if the user has the required role.
+func (bot *HelpBot) hasRole(f func(*discordgo.InteractionCreate), roles ...string) func(*discordgo.InteractionCreate) {
+	return func(m *discordgo.InteractionCreate) {
+		if !bot.hasRoles(m.GuildID, m.Member, roles...) {
+			replyMsg(bot.client, m, "You do not have permission to use this command.")
+			return
+		}
+		f(m)
+	}
+}
+
+func (bot *HelpBot) configureCommand(m *discordgo.InteractionCreate) {
+	if m.Data.Type() != discordgo.InteractionApplicationCommand {
+		bot.log.Errorln("Received non-application command interaction")
 		return
 	}
 
-	if !assistant.Waiting {
-		replyMsg(bot.client, m, "You were not marked as waiting, so no action was taken.")
+	data := m.ApplicationCommandData()
+
+	if len(data.Options) == 0 || data.Options[0].Value == nil {
+		replyMsg(bot.client, m, "Please provide a course name")
 		return
 	}
-
-	err = tx.Model(&Assistant{}).Where("user_id = ?", m.Message.Author.ID).UpdateColumn("waiting", false).Error
+	course, err := bot.db.GetCourse(&models.Course{Name: data.Options[0].Value.(string)})
 	if err != nil {
-		bot.log.Errorln("Failed to update status in DB:", err)
-		replyMsg(bot.client, m, "An unknown error occurred when attempting to update waiting status.")
+		replyMsg(bot.client, m, fmt.Sprintf("Failed to get course: %v", err))
 		return
 	}
 
-	tx.Commit()
+	if course.GuildID != "" {
+		replyMsg(bot.client, m, "This course is already configured for another server.")
+		return
+	}
 
-	replyMsg(bot.client, m, fmt.Sprintf("Your waiting status was removed (you will have to use %snext again to get the next student)", bot.cfg.Prefix))
+	course.GuildID = m.GuildID
+	if err := bot.db.UpdateCourse(course); err != nil {
+		replyMsg(bot.client, m, fmt.Sprintf("Failed to update course: %v", err))
+		return
+	}
+
+	if err = bot.initServer(bot.client, m.GuildID); err != nil {
+		replyMsg(bot.client, m, fmt.Sprintf("Failed to configure server: %v", err))
+		return
+	}
+	replyMsg(bot.client, m, fmt.Sprintf("Server was configured for course %s", course.Name))
 }

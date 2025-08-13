@@ -2,34 +2,41 @@ package helpbot
 
 import (
 	"context"
-	"time"
+	"crypto/tls"
+	"net/http"
 
-	agpb "github.com/autograde/quickfeed/ag"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
+	"github.com/bufbuild/connect-go"
+	"github.com/quickfeed/quickfeed/qf/qfconnect"
 )
 
-type Autograder struct {
-	cc *grpc.ClientConn
-	agpb.AutograderServiceClient
-	md metadata.MD
+type QuickFeed struct {
+	qf qfconnect.QuickFeedServiceClient
 }
 
-func (s *Autograder) Close() {
-	s.cc.Close()
-}
-
-func NewAutograder(authToken string) (*Autograder, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	cc, err := grpc.DialContext(ctx, ":9090", grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		return nil, err
+func NewQuickFeed(authToken string) (*QuickFeed, error) {
+	client := http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
 	}
-	ag := agpb.NewAutograderServiceClient(cc)
-	return &Autograder{
-		cc:                      cc,
-		AutograderServiceClient: ag,
-		md:                      metadata.New(map[string]string{"cookie": authToken}),
+	qf := qfconnect.NewQuickFeedServiceClient(&client, "https://uis.itest.run", connect.WithInterceptors(
+		tokenAuthClientInterceptor(authToken),
+	))
+	return &QuickFeed{
+		qf: qf,
 	}, nil
+}
+
+// NewTokenAuthClientInterceptor returns a client interceptor that will add the given token in the Authorization header.
+func tokenAuthClientInterceptor(token string) connect.UnaryInterceptorFunc {
+	interceptor := func(next connect.UnaryFunc) connect.UnaryFunc {
+		return connect.UnaryFunc(func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+			if req.Spec().IsClient {
+				// Send a token with client requests.
+				req.Header().Set("Authorization", token)
+			}
+			return next(ctx, req)
+		})
+	}
+	return connect.UnaryInterceptorFunc(interceptor)
 }
