@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/Raytar/helpbot"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -23,45 +24,35 @@ var log = &logrus.Logger{
 	Level:     logrus.InfoLevel,
 }
 
-var ag *helpbot.QuickFeed
-
 func main() {
 	var cfgFile string
-	flag.StringVar(&cfgFile, "config", ".helpbotrc", "Path to configuration file")
+	flag.StringVar(&cfgFile, "config", "config.json", "Path to configuration file")
 	flag.Parse()
 
-	err := initConfig(cfgFile)
+	config, err := loadConfig(cfgFile)
 	if err != nil {
-		log.Fatalln("Failed to init config:", err)
+		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	if viper.GetBool("quickfeed") {
-		authToken := viper.GetString("auth-token")
-		if authToken == "" {
-			log.Fatalln("QUICKFEED_AUTH_TOKEN is not set")
-		}
-		ag, err = helpbot.NewQuickFeed(authToken)
-		if err != nil {
-			log.Fatalln("Failed to init autograder:", err)
-		}
+	if config.GHToken == "" {
+		log.Fatalln("QUICKFEED_AUTH_TOKEN is not set")
+	}
+	qf, err := helpbot.NewQuickFeed(config.GHToken)
+	if err != nil {
+		log.Fatalln("Failed to init autograder:", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var bots []*helpbot.HelpBot
-
-	for _, c := range cfg { 
-		bot, err := helpbot.New(c, log, ag)
-		if err != nil {
-			log.Fatalf("Failed to initialize bot: %v", err)
-		}
-		err = bot.Connect(ctx)
-		if err != nil {
-			log.Errorf("Failed to connect: %v", err)
-			continue
-		}
-		bots = append(bots, bot)
+	bot, err := helpbot.New(*config, log, qf)
+	if err != nil {
+		log.Fatalf("Failed to initialize bot: %v with config %v", err, config)
+	}
+	err = bot.Connect(ctx)
+	if err != nil {
+		log.Errorf("Failed to connect: %v", err)
+		return
 	}
 
 	// run until interrupted
@@ -70,32 +61,18 @@ func main() {
 	<-c
 
 	// cleanup
-	if ag != nil {
-		for _, b := range bots {
-			b.Disconnect()
-		}
-		cancel()
-	}
 }
 
-var cfg []helpbot.Config
-
-func initConfig(cfgFile string) (err error) {
-	// command line
-
-	// env
-	viper.SetEnvPrefix(botName)
-	viper.AutomaticEnv()
-
-	// config file
-	viper.SetConfigName(cfgFile)
-	viper.SetConfigType("toml")
-	viper.AddConfigPath(".")
-	err = viper.ReadInConfig()
+func loadConfig(cfgFile string) (config *helpbot.Config, err error) {
+	file, err := os.Open(cfgFile)
 	if err != nil {
-		return
+		return nil, fmt.Errorf("failed to open config file %s: %w", cfgFile, err)
 	}
+	defer file.Close()
 
-	err = viper.UnmarshalKey("instances", &cfg)
-	return
+	config = &helpbot.Config{}
+	if err := json.NewDecoder(file).Decode(config); err != nil {
+		return nil, fmt.Errorf("failed to decode config file %s: %w", cfgFile, err)
+	}
+	return config, nil
 }

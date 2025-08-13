@@ -109,8 +109,8 @@ func (bot *HelpBot) discordMessageCreate(s *discordgo.Session, m *discordgo.Inte
 		cmdFunc(m)
 		return
 	}
-	replyMsg(bot.client, m, fmt.Sprintf("'%s' is not a recognized command. See %shelp for available commands.",
-		command, bot.cfg.Prefix))
+	replyMsg(bot.client, m, fmt.Sprintf("'%s' is not a recognized command. See /help for available commands.",
+		command))
 }
 
 func getMember(s *discordgo.Session, i *discordgo.InteractionCreate) *discordgo.Member {

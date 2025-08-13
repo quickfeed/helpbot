@@ -13,18 +13,11 @@ import (
 )
 
 type Config struct {
-	Token         string `mapstructure:"token"`
-	DBPath        string `mapstructure:"db-path"`
-	AppID         string `mapstructure:"app-id"`
-	GHToken       string `mapstructure:"gh-token"`
-	Prefix        string `mapstructure:"prefix"`
-	Guild         string `mapstructure:"guild"`
-	StudentRole   string `mapstructure:"student-role"`
-	AssistantRole string `mapstructure:"assistant-role"`
-	GitHubOrg     string `mapstructure:"gh-org"`
-	CourseCode    string `mapstructure:"course-code"`
-	CourseYear    uint32 `mapstructure:"course-year"`
-	QuickFeed     bool   `mapstructure:"quickfeed"`
+	Token     string `json:"token"`
+	DBPath    string `json:"database"`
+	AppID     string `json:"app_id"`
+	GHToken   string `json:"auth_token"`
+	QuickFeed bool   `json:"quickfeed"`
 }
 
 type HelpBot struct {
@@ -44,7 +37,7 @@ type HelpBot struct {
 
 func (bot *HelpBot) Connect(ctx context.Context) error {
 	if bot.client == nil {
-		return fmt.Errorf("disgord client not initialized for course: %s", bot.cfg.CourseCode)
+		return fmt.Errorf("Discord client is not initialized")
 	}
 	return bot.client.Open()
 }

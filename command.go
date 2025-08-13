@@ -341,9 +341,7 @@ func (bot *HelpBot) registerCommand(m *discordgo.InteractionCreate) {
 		return
 	}
 
-	replyMsg(bot.client, m, fmt.Sprintf(
-		"Authentication was successful! You should now have more access to the server. Type %shelp to see available commands",
-		bot.cfg.Prefix))
+	replyMsg(bot.client, m, "Authentication was successful! You should now have more access to the server. Type /help to see available commands")
 }
 
 func (bot *HelpBot) unregisterCommand(m *discordgo.InteractionCreate) {
@@ -370,7 +368,8 @@ func (bot *HelpBot) unregisterCommand(m *discordgo.InteractionCreate) {
 	}
 
 	// unassign role
-	if err := bot.client.GuildMemberRoleRemove(m.GuildID, user.ID, bot.cfg.StudentRole); err != nil {
+	// TODO: Get the student role from database, not cfg
+	if err := bot.client.GuildMemberRoleRemove(m.GuildID, user.ID, "bot.cfg.StudentRole"); err != nil {
 		replyMsg(bot.client, m, "Failed to remove user roles. You may have to remove role/nickname manually.")
 		bot.log.Errorln("Failed to remove user roles:", err)
 		return
@@ -384,7 +383,7 @@ func (bot *HelpBot) assistantCancelCommand(m *discordgo.InteractionCreate) {
 		replyMsg(bot.client, m, fmt.Sprintf("Failed to cancel waiting status: %v", err))
 		return
 	}
-	replyMsg(bot.client, m, fmt.Sprintf("Your waiting status was removed (you will have to use %snext again to get the next student)", bot.cfg.Prefix))
+	replyMsg(bot.client, m, "Your waiting status was removed (you will have to use /next again to get the next student)")
 }
 
 // hasRole returns a function that checks if the user has the specified role, and then calls the original function.
