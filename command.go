@@ -207,17 +207,19 @@ func (bot *HelpBot) listCommand(m *discordgo.InteractionCreate) {
 }
 
 func (bot *HelpBot) clearCommand(m *discordgo.InteractionCreate) {
-	words := strings.Fields(m.Message.Content)
-	if len(words) < 2 || words[1] != "YES" {
-		replyMsg(bot.client, m, fmt.Sprintf(
-			"This command will cancel all the requests in the queue. If you really want to do this, type `%sclear YES`",
-			bot.cfg.Prefix,
-		))
+	data := m.ApplicationCommandData().Options
+	if len(data) < 1 || data[0].Type != discordgo.ApplicationCommandOptionBoolean {
+		replyMsg(bot.client, m, "You must specify whether to clear the queue or not.")
+		return
+	}
+
+	if !data[0].BoolValue() {
+		replyMsg(bot.client, m, "No changes were made to the queue.")
 		return
 	}
 
 	// TODO: send a message to each student whose request was cleared.
-	if err := bot.db.ClearHelpRequests(m.Member.User.ID); err != nil {
+	if err := bot.db.ClearHelpRequests(m.Member.User.ID, m.GuildID); err != nil {
 		bot.log.Errorln("Failed to clear queue:", err)
 		replyMsg(bot.client, m, "Clear failed due to an error.")
 		return

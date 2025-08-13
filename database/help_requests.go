@@ -9,8 +9,8 @@ import (
 	"gorm.io/gorm"
 )
 
-func (db *Database) ClearHelpRequests(assistantID string) error {
-	return db.conn.Model(&models.HelpRequest{}).Where("done = ? ", false).Updates(map[string]interface{}{
+func (db *Database) ClearHelpRequests(assistantID, guildID string) error {
+	return db.conn.Model(&models.HelpRequest{}).Where("done = ? AND guild_id = ?", false, guildID).Updates(map[string]any{
 		"done":              true,
 		"done_at":           time.Now(),
 		"assistant_user_id": assistantID,
@@ -140,7 +140,6 @@ func (db *Database) AssignNextRequest(assistantID, guildID string) (*models.Help
 			"done_at":           time.Now(),
 			"reason":            "assistantNext",
 		}).Error
-
 		if err != nil {
 			db.log.Errorln("Failed to update help request:", err)
 			return fmt.Errorf("an error occurred while fetching the next request")

@@ -139,6 +139,19 @@ func GetCommands(course *models.Course) []*discordgo.ApplicationCommand {
 			Description:              "Get the next student in the queue.",
 		},
 		{
+			Name:                     "clear",
+			DefaultMemberPermissions: &permAssistant,
+			Description:              "Clear the queue of all students waiting for help.",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Name:        "confirm",
+					Type:        discordgo.ApplicationCommandOptionBoolean,
+					Description: "Confirm that you want to clear the queue. This cannot be undone.",
+					Required:    true,
+				},
+			},
+		},
+		{
 			Name:                     "config",
 			Description:              "Configure this server with a course.",
 			DefaultMemberPermissions: &permAdmin,
