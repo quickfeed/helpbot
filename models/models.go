@@ -41,4 +41,5 @@ type Course struct {
 	CourseID int64 `gorm:"primary_key"`
 	Name     string
 	GuildID  string
+	Year     uint32
 }

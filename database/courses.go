@@ -1,15 +1,21 @@
 package database
 
 import (
+	"errors"
+
 	"github.com/Raytar/helpbot/models"
 	"github.com/quickfeed/quickfeed/qf"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 func (db *Database) GetCourse(query *models.Course) (*models.Course, error) {
 	var course models.Course
 	if err := db.conn.Model(course).Where(query).First(&course).Error; err != nil {
-		db.log.Errorln("Failed to get course from DB:", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			db.log.Errorln("Course not found in DB")
+		}
+		db.log.Errorf("Failed to get course from DB: %v, %T", err, err)
 		return nil, err
 	}
 	return &course, nil
@@ -29,6 +35,7 @@ func (db *Database) UpdateCourses(courses []*qf.Course) error {
 			CourseID: int64(course.ID),
 			Name:     course.Name,
 			GuildID:  "",
+			Year:     course.Year,
 		}).Error; err != nil {
 			db.log.Errorln("Failed to update courses:", err)
 			return err

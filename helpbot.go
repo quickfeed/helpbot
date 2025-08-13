@@ -49,8 +49,8 @@ func (bot *HelpBot) Disconnect() error {
 func GetCommands(course *models.Course) []*discordgo.ApplicationCommand {
 	courseChoices := []*discordgo.ApplicationCommandOptionChoice{
 		{
-			Name:  course.Name,
-			Value: course.Name,
+			Name:  fmt.Sprintf("%s %d", course.Name, course.Year),
+			Value: fmt.Sprintf("%d", course.CourseID),
 		},
 	}
 
