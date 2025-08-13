@@ -57,10 +57,15 @@ func main() {
 
 	// run until interrupted
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-c
-
 	// cleanup
+	log.Info("Shutting down bot...")
+	if err := bot.Disconnect(); err != nil {
+		log.Errorln("Failed to disconnect bot:", err)
+	} else {
+		log.Info("Bot disconnected successfully.")
+	}
 }
 
 func loadConfig(cfgFile string) (config *helpbot.Config, err error) {
